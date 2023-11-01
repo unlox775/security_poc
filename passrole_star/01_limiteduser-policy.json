@@ -22,7 +22,7 @@
             "NotResource": "arn:aws:cloudformation:*:aws:transform/Serverless-2016-10-31",
             "Condition": {
                 "StringNotEquals": {
-                    "cloudformation:RoleARN": "arn:aws:iam::165336972514:role/AWSCloudFormationServiceRolePowerUser"
+                    "cloudformation:RoleARN": "arn:aws:iam::165336972514:role/OPSuperUserRole"
                 }
             }
         }

@@ -3,6 +3,7 @@ unset AWS_ACCESS_KEY_ID
 unset AWS_SECRET_ACCESS_KEY
 export AWS_PROFILE=codeorg-dev
 export AWS_REGION=us-west-2
+export ACCOUNT_ID=165336972514
 
 function cleanup_iam_user() {
     local IAM_USER="$1"
@@ -60,6 +61,35 @@ function cleanup_iam_role() {
     aws iam delete-role --role-name "$ROLE_NAME"
 }
 
+function cleanup_stack_set_instances() {
+    local STACK_SET_NAME="$1"
+
+    if [[ -z "$STACK_SET_NAME" ]]; then
+        echo "Please provide a StackSet name as an argument."
+        return 1
+    fi
+
+    # List all StackSet instances
+    for instance in $(aws cloudformation list-stack-instances --stack-set-name "$STACK_SET_NAME" --query 'Summaries[*].StackId' --output text); do
+        # Get Stack Name and Account ID from StackId
+        local STACK_NAME=$(echo $instance | cut -d':' -f6 | cut -d'/' -f2)
+        local ACCOUNT_ID=$(echo $instance | cut -d':' -f5)
+
+        echo "Deleting StackSet instance with Stack Name: $STACK_NAME in Account: $ACCOUNT_ID..."
+        
+        # Delete the stack instance from the stack set.
+        # If you want to retain stacks, remove --retain-stacks flag
+        aws cloudformation delete-stack-instances --stack-set-name "$STACK_SET_NAME" --accounts "$ACCOUNT_ID" --regions "$AWS_REGION" --retain-stacks
+
+        # It's a good idea to have some error handling, in case a stack instance deletion fails. 
+        # Wait for the instance to be deleted
+        aws cloudformation wait stack-delete-complete --stack-name "$STACK_NAME"
+    done
+
+    echo "All instances of StackSet $STACK_SET_NAME have been deleted."
+}
+
+
 # remove the LimitedUser and LimitedUserPolicy
 cleanup_iam_user LimitedUser
 
@@ -69,3 +99,7 @@ cleanup_iam_role OPSuperUserRole
 # remove the SecurityPOC Cloudformation stack
 echo "Deleting SecurityPOC Cloudformation stack..."
 aws cloudformation delete-stack --stack-name SecurityPOC
+
+# remove the SecurityPOCStackSet Cloudformation stackset
+echo "Deleting SecurityPOCStackSet Cloudformation stackset..."
+cleanup_stack_set_instances SecurityPOCStackSet

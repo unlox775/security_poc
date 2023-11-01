@@ -8,6 +8,9 @@ if [ -z "$AWS_ACCESS_KEY_ID" ] || [ -z "$AWS_SECRET_ACCESS_KEY" ]; then
   exit 1
 fi
 
+# # Create a Stack
+# aws cloudformation create-stack --stack-name SecurityPOC --template-body file://03_cf_template.yml --role-arn arn:aws:iam::165336972514:role/OPSuperUserRole  --capabilities CAPABILITY_NAMED_IAM | cat -
+
 # Create a cloudformation stack
 aws cloudformation create-stack-set \
   --stack-set-name SecurityPOCStackSet \
