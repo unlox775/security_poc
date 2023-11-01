@@ -3,7 +3,6 @@ unset AWS_ACCESS_KEY_ID
 unset AWS_SECRET_ACCESS_KEY
 export AWS_PROFILE=codeorg-dev
 export AWS_REGION=us-west-2
-export ACCOUNT_ID=165336972514
 
 function cleanup_iam_user() {
     local IAM_USER="$1"
@@ -70,23 +69,23 @@ function cleanup_stack_set_instances() {
     fi
 
     # List all StackSet instances
-    for instance in $(aws cloudformation list-stack-instances --stack-set-name "$STACK_SET_NAME" --query 'Summaries[*].StackId' --output text); do
-        # Get Stack Name and Account ID from StackId
-        local STACK_NAME=$(echo $instance | cut -d':' -f6 | cut -d'/' -f2)
-        local ACCOUNT_ID=$(echo $instance | cut -d':' -f5)
+    instances=$(aws cloudformation list-stack-instances --stack-set-name "$STACK_SET_NAME" --query 'Summaries[?StackInstanceStatus.DetailedStatus==`FAILED` || StackInstanceStatus.DetailedStatus==`OUTDATED`].{Region: Region, Account: Account}' --output json)
 
-        echo "Deleting StackSet instance with Stack Name: $STACK_NAME in Account: $ACCOUNT_ID..."
-        
+    # Iterate over the returned instances
+    echo "$instances" | jq -r '.[] | "\(.Account) \(.Region)"' | while read account region; do
+        echo "Deleting StackSet instance in Account: $account and Region: $region..."
+
         # Delete the stack instance from the stack set.
         # If you want to retain stacks, remove --retain-stacks flag
-        aws cloudformation delete-stack-instances --stack-set-name "$STACK_SET_NAME" --accounts "$ACCOUNT_ID" --regions "$AWS_REGION" --retain-stacks
+        aws cloudformation delete-stack-instances --stack-set-name "$STACK_SET_NAME" --accounts "$account" --regions "$region" --no-retain-stacks
 
         # It's a good idea to have some error handling, in case a stack instance deletion fails. 
-        # Wait for the instance to be deleted
-        aws cloudformation wait stack-delete-complete --stack-name "$STACK_NAME"
+        # Note: There's no need to wait for stack-delete-complete since there's no associated stack.
     done
 
     echo "All instances of StackSet $STACK_SET_NAME have been deleted."
+    aws cloudformation delete-stack-set --stack-set-name "$STACK_SET_NAME" | cat -
+    echo "StackSet $STACK_SET_NAME has been deleted."
 }
 
 
