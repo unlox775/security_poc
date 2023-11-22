@@ -39,7 +39,7 @@ To start the main service and set up the ngrok tunnel, run the following command
 make start
 ```
 
-Example Runtime output:
+Example Runtime output (NOTE: the key is randomly generated each time):
 
 ```bash
 Starting services with concurrently...
