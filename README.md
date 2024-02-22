@@ -20,6 +20,8 @@ The Have I Been Pwned Domain Report Tool is a straightforward command-line utili
 
 **Usage**: Execute `tools/haveibeenpwned_domain_report example.com | tee ~/Downloads/$(date +%Y-%m-%d)_hibp-example.com.csv` in the terminal. Replace `example.com` with the domain you're investigating.
 
+> :warning: **Note**: Before executing the command, make sure to set the environment variable `HAVEIBEENPWNED_KEY` with your Have I Been Pwned API key. This key is required to interact with the HIBP API and generate the domain report.
+
 **Output Columns**:
 - **Email**: The breached email addresses under the domain.
 - **Data Types**: Separate columns for each type of compromised data, filled with breach dates. If an email has no data breached of a specific type, that cell is left empty.
