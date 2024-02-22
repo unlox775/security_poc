@@ -1,0 +1,136 @@
+#!/usr/bin/env python3
+
+import requests
+import os
+import sys
+import json
+
+# library to to CSV format
+import csv
+
+# Step 1: Download the list of breached email accounts for the domain code.org
+# Resuting example format:
+#    {
+#      "person1": [
+#         "Adobe"
+#      ],
+#      "person2": [
+#         "Adobe",
+#         "Gawker",
+#         "Stratfor"
+#      ],
+#      "person3": [
+#         "AshleyMadison"
+#      ]
+#    }
+def download_breached_accounts(domain, api_key):
+    url = f"https://haveibeenpwned.com/api/v3/breacheddomain/{domain}"
+    headers = {"hibp-api-key": api_key}
+    response = requests.get(url, headers=headers)
+
+    if response.status_code == 200:
+        # Print the response
+        # print(response.json())
+
+        return response.json()
+    else:
+        # fatal error
+        raise Exception("Failed to download breached accounts, Details: ", response)
+
+# Step 2: Download the full list of breaches
+def download_breaches():
+    url = "https://haveibeenpwned.com/api/v3/breaches"
+    response = requests.get(url)
+    if response.status_code == 200:
+        return response.json()
+    else:
+        raise Exception("Failed to download breaches")
+
+# Step 3: Join the breached accounts with the breach details
+def join_breaches(accounts, breaches):
+    breach_dict = {breach['Name']: breach for breach in breaches}
+    final_data = {}
+    # Iterating through the dictionary
+    for person, breach_list in accounts.items():
+        breach_objects = []
+        for breach in breach_list:
+            # skip if the breach is not in the breach_dict
+            if breach in breach_dict:
+                breach_objects.append(breach_dict[breach])
+                # print(f"- {breach}")
+
+        final_data[person] = breach_objects
+
+    return final_data
+
+# Step 4: Get distinct dataclasses
+def get_distinct_dataclasses(data):
+    all_classes = set()
+    for person, breaches in data.items():
+        for breach in breaches:
+            all_classes.update(breach['DataClasses'])
+
+    return all_classes
+
+# Step 5: Prepare CSV with:
+# - the person name
+# - one column per dataclass where the column value is a comma-delim list of breach dates
+# - a final column with the list of breach names, comma-delim
+def prepare_csv(data, all_classes):
+    final_data = []
+    for person, breaches in data.items():
+        row = {"person": person}
+        for dataclass in all_classes:
+            breach_dates = []
+            for breach in breaches:
+                if dataclass in breach['DataClasses']:
+                    breach_dates.append(breach['BreachDate'])
+            row[dataclass] = ", ".join(breach_dates)
+        breach_names = [breach['Name'] for breach in breaches]
+        row["breach_names"] = ", ".join(breach_names)
+        final_data.append(row)
+
+    column_names = ["person"] + list(all_classes) + ["breach_names"]
+
+    # return the data, and the list of column name keys
+    return {"data": final_data, "columns": column_names}
+
+# Step 6: Print the CSV to STDOUT in CSV format (NOT JSON format)
+# escaping with double quotes, optional if no commas in the data
+def print_csv(data, columns):
+    # write to stdout
+    writer = csv.DictWriter(sys.stdout, fieldnames=columns)
+    writer.writeheader()
+    writer.writerows(data)
+        
+
+# Main function to orchestrate the steps
+def main():
+    # read domain from first argument
+    domain = sys.argv[1]
+    # read env var $HAVEIBEENPWNED_KEY
+    api_key = os.environ.get("HAVEIBEENPWNED_KEY")
+    
+    # Download the datasets
+    breached_accounts = download_breached_accounts(domain, api_key)
+    breaches = download_breaches()
+    
+    # Join the datasets
+    joined_breaches = join_breaches(breached_accounts, breaches)
+
+    # get distinct dataclasses
+    all_classes = get_distinct_dataclasses(joined_breaches)
+    # print(all_classes)
+
+    # Prepare CSV with:
+    # - the person name
+    # - one column per dataclass where the column value is a comma-delim list of breach dates
+    # - a final column with the list of breach names, comma-delim
+    csv_data = prepare_csv(joined_breaches, all_classes)
+    
+    # Print the CSV to STDOUT in CSV format (NOT JSON format)
+    print_csv(csv_data["data"], csv_data["columns"])
+
+    
+if __name__ == "__main__":
+    main()
