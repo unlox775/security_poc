@@ -76,10 +76,11 @@ def get_distinct_dataclasses(data):
 # - the person name
 # - one column per dataclass where the column value is a comma-delim list of breach dates
 # - a final column with the list of breach names, comma-delim
-def prepare_csv(data, all_classes):
+def prepare_csv(domain, data, all_classes):
     final_data = []
     for person, breaches in data.items():
-        row = {"person": person}
+        email = f"{person}@{domain}"
+        row = {"person": email}
         for dataclass in all_classes:
             breach_dates = []
             for breach in breaches:
@@ -126,7 +127,7 @@ def main():
     # - the person name
     # - one column per dataclass where the column value is a comma-delim list of breach dates
     # - a final column with the list of breach names, comma-delim
-    csv_data = prepare_csv(joined_breaches, all_classes)
+    csv_data = prepare_csv(domain, joined_breaches, all_classes)
     
     # Print the CSV to STDOUT in CSV format (NOT JSON format)
     print_csv(csv_data["data"], csv_data["columns"])
