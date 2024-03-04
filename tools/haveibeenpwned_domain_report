@@ -85,7 +85,7 @@ def prepare_csv(domain, data, all_classes):
             breach_dates = []
             for breach in breaches:
                 if dataclass in breach['DataClasses']:
-                    breach_dates.append(breach['BreachDate'])
+                    breach_dates.append(f"{breach['BreachDate']} at {breach['Name']}")
             row[dataclass] = ", ".join(breach_dates)
         breach_names = [breach['Name'] for breach in breaches]
         row["breach_names"] = ", ".join(breach_names)
