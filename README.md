@@ -13,6 +13,7 @@ Each folder generally represents a distinct proof of concept or test scenario.
    - A brief `README.md` explaining the concept or test.
    - Scripts or configuration files relevant to the test.  These are numbered to show the order in which they get executed.
    - A `99_cleanup.sh` script to revert any configurations or changes made during the demonstration.
+3. The Ip lookup tool, you can copy a column of IPs from a spreadsheet then run: `pbpaste| python3 ip_region_lookup.py --tsv | pbcopy`.  Then you can paste back into a spreadsheet.  The second column will be the region.
 
 ## haveibeenpwned_domain_report Tool
 
