@@ -18,17 +18,21 @@ class HostRewriteServer:
         @self.app.route('/', defaults={'path': ''})
         @self.app.route('/<path:path>')
         def proxy_request(path):
-            # Get request data
-            # Stream incoming body to avoid buffering large requests
-            data = request.environ.get('wsgi.input')
+            # Build a streaming proxy request
+            from .proxy_request import ProxyRequest
+            proxy_req = ProxyRequest.from_flask_streaming(request)
             query_string = request.query_string.decode() if request.query_string else None
+            # Stream request body to the upstream server
+            content, status_code, response_headers, original_headers = \
+                self.reverse_proxy.process_request(
+                    proxy_req.method,
+                    path,
+                    proxy_req.headers,
+                    proxy_req.body_stream,
+                    query_string
+                )
             
-            # Process the request through the reverse proxy
-            content, status_code, response_headers, original_headers = self.reverse_proxy.process_request(
-                request.method, path, dict(request.headers), data, query_string
-            )
-            
-            # Create Flask response with non-cookie headers
+            # Stream content back to client
             flask_response = Response(
                 content,
                 status=status_code,

@@ -86,6 +86,21 @@ class TestProxyResponse(unittest.TestCase):
         output = b''.join(chunks)
         self.assertIn(b'https://proxy.com/path', output)
         self.assertNotIn(b'http://original.com', output)
+    
+    def test_next_chunk_method(self):
+        # Ensure next_chunk reads sequential chunks and signals done
+        headers = [('Content-Type', 'text/plain')]
+        data = b'abcdef'
+        raw_response, _ = self.make_dummy_response(headers, body=data)
+        px_response = ProxyResponse.from_requests(raw_response)
+        # First chunk
+        chunk1, done1 = px_response.next_chunk('', '')
+        # Depending on underlying iter_content, chunk size may equal whole body
+        self.assertFalse(done1)
+        # Second call should signal done
+        chunk2, done2 = px_response.next_chunk('', '')
+        self.assertEqual(chunk2, b'')
+        self.assertTrue(done2)
 
 class TestProxyResponseIntegration(unittest.TestCase):
     def setUp(self):

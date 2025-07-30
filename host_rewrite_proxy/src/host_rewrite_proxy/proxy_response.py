@@ -66,4 +66,18 @@ class ProxyResponse:
             if hasattr(self.body_stream, 'close'):
                 self.body_stream.close()
         except Exception:
-            pass 
+            pass
+
+    def next_chunk(self, origin_host: str, proxy_host: str) -> (bytes, bool):
+        """
+        Read the next translated chunk from the response.
+        Returns a tuple (chunk_bytes, done_flag) where done_flag is True when no more data.
+        """
+        # Initialize iterator on first call
+        if not hasattr(self, '_translate_iter'):
+            self._translate_iter = self.translate_content(origin_host, proxy_host)
+        try:
+            chunk = next(self._translate_iter)
+            return chunk, False
+        except StopIteration:
+            return b'', True 
