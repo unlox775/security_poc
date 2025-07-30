@@ -22,9 +22,9 @@ host_rewrite_server/
 │       └── server.py              # Flask server implementation
 ├── tests/
 │   ├── __init__.py
-│   ├── test_cookie_extraction.py  # Tests for cookie extraction from requests
 │   ├── test_cookie_rewriter.py    # Unit tests for cookie rewriter
-│   └── test_server_flow.py        # Integration tests for server flow
+│   ├── test_reverse_proxy.py      # Tests for reverse proxy functionality
+│   └── test_server.py             # Tests for server functionality
 ├── server.py                      # Main server entry point
 ├── run_tests.py                   # Test runner
 ├── Makefile                       # Build and test automation
@@ -61,8 +61,11 @@ make test
 # Run unit tests only
 make test-unit
 
-# Run server flow tests only
-make test-server-flow
+# Run reverse proxy tests only
+make test-reverse-proxy
+
+# Run server tests only
+make test-server
 ```
 
 ### Manual Testing
@@ -84,8 +87,8 @@ make test-server-flow
 The project includes comprehensive tests:
 
 - **Unit Tests**: Test individual components like cookie parsing and rewriting
-- **Integration Tests**: Test the complete server flow with mocked responses
-- **Cookie Extraction Tests**: Test the extraction of cookies from requests.Response objects
+- **Reverse Proxy Tests**: Test URL rewriting, request processing, and cookie handling
+- **Server Tests**: Test Flask server functionality and integration
 
 ## Development
 
