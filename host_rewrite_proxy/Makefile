@@ -4,7 +4,7 @@
 start:
 	@pkill ngrok || true
 	@echo "Starting services with concurrently..."
-	@concurrently --prefix none "ngrok http 5002" "python3 server.py $(TARGET)"
+	@concurrently --prefix none "ngrok http 5002" "PYTHONPATH=src python3 server.py $(TARGET)"
 
 # Stop the proxy server
 stop:

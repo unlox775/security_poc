@@ -3,6 +3,7 @@
 import re
 from datetime import datetime
 from typing import List, Dict, Any
+from . import bug
 
 class CookieRewriter:
     """Handles rewriting of cookie domains in proxy responses"""
@@ -166,19 +167,30 @@ class CookieRewriter:
             response_headers: Headers from the upstream response
             flask_response: Flask Response object to set cookies on
         """
-        if 'set-cookie' not in response_headers:
+        # Handle case-sensitive header matching
+        set_cookie_key = None
+        for key in response_headers.keys():
+            if key.lower() == 'set-cookie':
+                set_cookie_key = key
+                break
+        
+        if not set_cookie_key:
             return
             
         # Get original cookies - extract all Set-Cookie headers properly
         original_cookies = []
         for key, value in response_headers.items():
             if key.lower() == 'set-cookie':
-                original_cookies.append(value)
+                # Handle both single string and list of strings
+                if isinstance(value, list):
+                    original_cookies.extend(value)
+                else:
+                    original_cookies.append(value)
         
         # Rewrite all cookies
         rewritten_cookies = self.rewrite_cookies(original_cookies)
-        print(f"Original cookies: {original_cookies}")
-        print(f"Rewritten cookies: {rewritten_cookies}")
+        bug(original_cookies)
+        bug(rewritten_cookies)
         
         # Set each rewritten cookie on the Flask response
         for cookie_string in rewritten_cookies:
@@ -235,9 +247,56 @@ class CookieRewriter:
         if isinstance(cookie_header, list):
             return cookie_header
         
-        # Use regex to split on ", " followed by a cookie name pattern
+        # Handle case where cookie_header is a single string (possibly concatenated)
+        if isinstance(cookie_header, str):
+            # Use a proper Set-Cookie parser that handles commas in values
+            return self._parse_set_cookie_header(cookie_header)
+        
+        return []
+    
+    def _parse_set_cookie_header(self, header_string: str) -> List[str]:
+        """Parse a Set-Cookie header string that may contain multiple cookies"""
+        cookies = []
+        current_cookie = ""
+        in_quotes = False
+        i = 0
+        
+        while i < len(header_string):
+            char = header_string[i]
+            
+            if char == '"':
+                in_quotes = not in_quotes
+                current_cookie += char
+            elif char == ',' and not in_quotes:
+                # Check if this comma is followed by a cookie name pattern
+                # Look ahead to see if we have "NAME=value" pattern
+                next_part = header_string[i+1:].strip()
+                if self._looks_like_cookie_start(next_part):
+                    # This is a cookie separator
+                    if current_cookie.strip():
+                        cookies.append(current_cookie.strip())
+                    current_cookie = ""
+                else:
+                    # This comma is part of a value (like in a date)
+                    current_cookie += char
+            else:
+                current_cookie += char
+            
+            i += 1
+        
+        # Add the last cookie
+        if current_cookie.strip():
+            cookies.append(current_cookie.strip())
+        
+        return cookies
+    
+    def _looks_like_cookie_start(self, text: str) -> bool:
+        """Check if text looks like the start of a new cookie (NAME=value pattern)"""
+        # Remove leading whitespace
+        text = text.strip()
+        
+        # Look for pattern like "NAME=value" or "NAME="
+        # Cookie names are typically alphanumeric with some special chars
         import re
-        # Split on ", " that is followed by a pattern like "NAME=value"
-        pattern = r', (?=[A-Za-z_][A-Za-z0-9_]*=)'
-        cookies = re.split(pattern, cookie_header)
-        return [cookie.strip() for cookie in cookies if cookie.strip()]
+        pattern = r'^[A-Za-z_][A-Za-z0-9_-]*='
+        return bool(re.match(pattern, text))

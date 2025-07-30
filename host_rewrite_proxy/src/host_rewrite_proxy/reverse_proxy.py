@@ -88,7 +88,7 @@ class ReverseProxy:
             print(f"{request_method} {request_path} -> {response.status_code} ({len(content)} bytes)")
             sys.stdout.flush()
             
-            return content, response.status_code, response_headers, response.headers
+            return content, response.status_code, response_headers, response.raw.headers
             
         except Exception as e:
             print(f"Error proxying request: {str(e)}")
