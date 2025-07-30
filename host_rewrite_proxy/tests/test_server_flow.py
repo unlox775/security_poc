@@ -4,9 +4,22 @@ Test the server's cookie handling flow with simple, readable examples.
 """
 
 import unittest
+import sys
+import os
 from unittest.mock import Mock
 from flask import Response
-from src.host_rewrite_proxy.cookie_rewriter import CookieRewriter
+
+# Add src directory to Python path
+current_dir = os.path.dirname(os.path.abspath(__file__))
+src_dir = os.path.join(current_dir, '..', 'src')
+print(f"Current dir: {current_dir}")
+print(f"Src dir: {src_dir}")
+print(f"Exists: {os.path.exists(src_dir)}")
+sys.path.insert(0, src_dir)
+
+import sys
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'src')))
+from host_rewrite_proxy.cookie_rewriter import CookieRewriter
 
 
 class MockHeaders:

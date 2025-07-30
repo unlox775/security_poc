@@ -67,4 +67,4 @@ def get_ngrok_url():
 
     print("Failed to retrieve ngrok URL.")
     print("Please start ngrok first: ngrok http 5002")
-    sys.exit(1) 
+    sys.exit(1)

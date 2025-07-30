@@ -121,4 +121,4 @@ class TestCookieExtraction(unittest.TestCase):
         self.assertEqual(original_cookies[2], 'pref=GHI789; Path=/; HttpOnly')
 
 if __name__ == '__main__':
-    unittest.main() 
+    unittest.main()

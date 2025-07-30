@@ -96,4 +96,4 @@ class ReverseProxy:
     
     def process_cookies(self, response_headers, flask_response):
         """Process cookies from the response and set them on the Flask response"""
-        self.cookie_rewriter.rewrite_cookies_and_set_on_response(response_headers, flask_response) 
+        self.cookie_rewriter.rewrite_cookies_and_set_on_response(response_headers, flask_response)

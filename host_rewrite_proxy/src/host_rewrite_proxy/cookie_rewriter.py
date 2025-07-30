@@ -1,102 +1,76 @@
+#!/usr/bin/env python3
+
 import re
 from datetime import datetime
-from typing import Dict, Any, List
+from typing import List, Dict, Any
 
 class CookieRewriter:
+    """Handles rewriting of cookie domains in proxy responses"""
+    
     def __init__(self, target_host: str, proxy_host: str):
         self.target_host = target_host
         self.proxy_host = proxy_host
-
+        
     def parse_cookie_string(self, cookie_string: str) -> Dict[str, Any]:
-        """Parse a cookie string into its components"""
+        """Parse a single cookie string into its components"""
         if '=' not in cookie_string:
-            return None
+            return {}
             
-        # Split on first '=' to separate name/value from attributes
-        name_value, attrs_part = cookie_string.split('=', 1)
-        name = name_value.strip()
+        parts = cookie_string.split(';')
+        name_value = parts[0].strip()
         
-        # Find the value (everything up to the first semicolon)
-        if ';' in attrs_part:
-            value, attrs_part = attrs_part.split(';', 1)
-        else:
-            value = attrs_part
-            attrs_part = ''
+        if '=' not in name_value:
+            return {}
             
-        value = value.strip()
-        
-        # Parse attributes
+        name, value = name_value.split('=', 1)
         attrs = {}
-        if attrs_part:
-            # Split on semicolons, but be careful with dates that contain commas
-            attr_parts = self._split_attrs(attrs_part)
-            for part in attr_parts:
-                part = part.strip()
-                if '=' in part:
-                    attr_name, attr_value = part.split('=', 1)
-                    attrs[attr_name.strip().lower()] = attr_value.strip()
-                else:
-                    attrs[part.lower()] = True
-                    
+        
+        for part in parts[1:]:
+            part = part.strip()
+            if '=' in part:
+                attr_name, attr_value = part.split('=', 1)
+                attrs[attr_name.lower()] = attr_value.strip()
+            else:
+                attrs[part.lower()] = True
+                
         return {
-            'name': name,
-            'value': value,
+            'name': name.strip(),
+            'value': value.strip(),
             'attrs': attrs
         }
     
-    def _split_attrs(self, attrs_part: str) -> List[str]:
-        """Split attributes, being careful with dates that contain commas"""
-        parts = []
-        current_part = ""
-        paren_count = 0
-        
-        for char in attrs_part:
-            if char == '(':
-                paren_count += 1
-            elif char == ')':
-                paren_count -= 1
-            elif char == ';' and paren_count == 0:
-                if current_part.strip():
-                    parts.append(current_part.strip())
-                current_part = ""
-                continue
-            current_part += char
-            
-        if current_part.strip():
-            parts.append(current_part.strip())
-            
-        return parts
-
     def should_rewrite_domain(self, domain: str) -> bool:
         """Check if a domain should be rewritten"""
         if not domain:
             return False
             
-        # Remove leading dot for comparison
-        clean_domain = domain.lstrip('.')
-        clean_target = self.target_host.lstrip('.')
+        domain = domain.lower()
+        target_variations = [
+            self.target_host.lower(),
+            f'.{self.target_host.lower()}',
+            f'www.{self.target_host.lower()}',
+            f'.www.{self.target_host.lower()}'
+        ]
         
-        # Check if domain matches target host or is a subdomain
-        return (clean_domain == clean_target or 
-                clean_domain.endswith('.' + clean_target))
-
+        return domain in target_variations
+    
     def rewrite_cookie_domain(self, cookie_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Rewrite the domain of a cookie if needed"""
-        if not cookie_data:
-            return cookie_data
-            
+        """Rewrite the domain in a cookie if needed"""
         attrs = cookie_data.get('attrs', {})
         domain = attrs.get('domain')
         
-        if domain and self.should_rewrite_domain(domain):
+        # If the cookie has a domain that should be rewritten, rewrite it
+        if self.should_rewrite_domain(domain):
             attrs['domain'] = self.proxy_host
+            cookie_data['attrs'] = attrs
+        # Note: Cookies without a domain are left as-is (no domain attribute)
             
         return cookie_data
-
+    
     def cookie_to_string(self, cookie_data: Dict[str, Any]) -> str:
         """Convert cookie data back to a string"""
         if not cookie_data:
-            return ""
+            return ''
             
         name = cookie_data.get('name', '')
         value = cookie_data.get('value', '')
@@ -105,63 +79,56 @@ class CookieRewriter:
         result = f"{name}={value}"
         
         # Add attributes in a consistent order
-        attr_order = ['domain', 'path', 'expires', 'max-age', 'secure', 'httponly', 'samesite']
-        
-        for attr_name in attr_order:
-            if attr_name in attrs:
-                attr_value = attrs[attr_name]
-                if attr_value is True:
-                    result += f"; {attr_name.title()}"
-                else:
-                    result += f"; {attr_name.title()}={attr_value}"
-                    
-        # Add any remaining attributes
-        for attr_name, attr_value in attrs.items():
-            if attr_name not in attr_order:
-                if attr_value is True:
-                    result += f"; {attr_name.title()}"
-                else:
-                    result += f"; {attr_name.title()}={attr_value}"
-                    
+        if 'path' in attrs:
+            result += f"; Path={attrs['path']}"
+        if 'domain' in attrs:
+            result += f"; Domain={attrs['domain']}"
+        if 'expires' in attrs:
+            result += f"; Expires={attrs['expires']}"
+        if 'max-age' in attrs:
+            result += f"; Max-Age={attrs['max-age']}"
+        if attrs.get('secure'):
+            result += "; Secure"
+        if attrs.get('httponly'):
+            result += "; HttpOnly"
+        if 'samesite' in attrs:
+            result += f"; SameSite={attrs['samesite']}"
+            
         return result
-
+    
     def rewrite_cookies(self, cookie_headers: List[str]) -> List[str]:
-        """Rewrite a list of cookie header strings"""
+        """Rewrite all cookies in a list of cookie headers"""
         rewritten_cookies = []
         
         for header in cookie_headers:
             # Split multiple cookies in one header
+            # Use a more sophisticated approach to handle commas in dates
             individual_cookies = self._split_cookies(header)
             
             for cookie in individual_cookies:
-                # Parse the cookie
                 cookie_data = self.parse_cookie_string(cookie)
-                if not cookie_data:
-                    continue
-                    
-                # Rewrite the domain
-                rewritten_data = self.rewrite_cookie_domain(cookie_data)
-                
-                # Convert back to string
-                rewritten_cookie = self.cookie_to_string(rewritten_data)
-                rewritten_cookies.append(rewritten_cookie)
-                
+                if cookie_data:
+                    rewritten_data = self.rewrite_cookie_domain(cookie_data)
+                    rewritten_string = self.cookie_to_string(rewritten_data)
+                    if rewritten_string:
+                        rewritten_cookies.append(rewritten_string)
+                        
         return rewritten_cookies
     
-    def _split_cookies(self, cookie_header: str) -> List[str]:
-        """Split multiple cookies in one header string"""
-        # This is a simple split for now - we'll need more sophisticated logic
-        # for cookies that contain commas in their values
-        return [cookie.strip() for cookie in cookie_header.split(',')]
-
+    #     def _split_cookies(self, cookie_header: str) -> List[str]:
+    #         """Split a cookie header into individual cookies, handling commas in dates"""
+    #         # Use regex to split on ", " followed by a cookie name pattern
+    #         import re
+    #         # Split on ", " that is followed by a pattern like "NAME=value"
+    #         pattern = r', (?=[A-Za-z_][A-Za-z0-9_]*=)'
+    #         cookies = re.split(pattern, cookie_header)
+    #         return [cookie.strip() for cookie in cookies if cookie.strip()]
+    
     def get_cookie_attrs_for_flask(self, cookie_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Convert cookie attributes to Flask-compatible format"""
-        if not cookie_data:
-            return {}
-            
+        """Convert cookie data to Flask set_cookie parameters"""
         attrs = cookie_data.get('attrs', {})
         
-        # Convert max-age to integer
+        # Handle max-age conversion
         max_age = attrs.get('max-age')
         if max_age and str(max_age).isdigit():
             max_age = int(max_age)
@@ -262,3 +229,15 @@ class CookieRewriter:
         
         # Set the cookie
         flask_response.set_cookie(name, value, **attrs) 
+    def _split_cookies(self, cookie_header) -> List[str]:
+        """Split a cookie header into individual cookies, handling commas in dates"""
+        # Handle case where cookie_header is already a list
+        if isinstance(cookie_header, list):
+            return cookie_header
+        
+        # Use regex to split on ", " followed by a cookie name pattern
+        import re
+        # Split on ", " that is followed by a pattern like "NAME=value"
+        pattern = r', (?=[A-Za-z_][A-Za-z0-9_]*=)'
+        cookies = re.split(pattern, cookie_header)
+        return [cookie.strip() for cookie in cookies if cookie.strip()]

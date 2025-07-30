@@ -1,173 +1,112 @@
-# Host Rewrite Proxy
+# Host Rewrite Server
 
-A reverse proxy tool that intercepts requests to a spoofed domain and forwards them to a target host while rewriting URLs, cookies, and headers to maintain the illusion that the user is interacting with the original domain.
+A reverse proxy server that rewrites cookie domains from the target host to the proxy host. This is useful for testing web applications where you need to proxy requests while maintaining proper cookie functionality.
 
-## Purpose
+## Features
 
-This tool demonstrates how a reverse proxy can be used to:
-- Intercept traffic to a spoofed domain (e.g., `spoof.com`)
-- Forward requests to a legitimate target (e.g., `example.com`)
-- Rewrite response content to maintain the spoofed domain in URLs
-- Handle cookies and headers appropriately
+- **Cookie Domain Rewriting**: Automatically rewrites cookie domains from the target host to the proxy host
+- **Multiple Cookie Support**: Handles multiple Set-Cookie headers and multiple cookies in a single header
+- **Subdomain Support**: Correctly identifies and rewrites subdomains (e.g., `www.example.com`, `.example.com`)
+- **URL Rewriting**: Rewrites URLs in HTML/CSS/JS content to use the proxy host
+- **Ngrok Integration**: Automatically detects and uses ngrok for public access
 
-This is useful for security testing, phishing simulations, and understanding how reverse proxies work in practice.
+## Project Structure
 
-## How It Works
-
-1. **Request Interception**: The proxy receives requests to the spoofed domain
-2. **Host Header Rewriting**: Changes the `Host` header to the target domain
-3. **Request Forwarding**: Sends the modified request to the target server
-4. **Response Processing**: Rewrites URLs in HTML/CSS/JS responses back to the spoofed domain
-5. **Cookie Handling**: Modifies cookie domains to work with the spoofed domain
-
-## Usage
-
-### Quick Start
-
-```bash
-# Start the proxy targeting example.com
-make start TARGET=example.com
+```
+host_rewrite_server/
+├── src/
+│   └── host_rewrite_proxy/
+│       ├── __init__.py
+│       ├── cookie_rewriter.py      # Cookie parsing and rewriting logic
+│       ├── reverse_proxy.py        # Reverse proxy functionality
+│       └── server.py              # Flask server implementation
+├── tests/
+│   ├── __init__.py
+│   ├── test_cookie_extraction.py  # Tests for cookie extraction from requests
+│   ├── test_cookie_rewriter.py    # Unit tests for cookie rewriter
+│   └── test_server_flow.py        # Integration tests for server flow
+├── server.py                      # Main server entry point
+├── run_tests.py                   # Test runner
+├── Makefile                       # Build and test automation
+├── requirements.txt               # Python dependencies
+└── README.md                      # This file
 ```
 
-### Manual Start
+## Installation
 
-```bash
-# Kill any existing ngrok processes
-pkill ngrok
-
-# Start ngrok tunnel
-ngrok http 5002
-
-# In another terminal, start the proxy
-python3 server.py example.com
-```
-
-### Command Line Options
-
-```bash
-python3 server.py <target_host> [--port <port>]
-
-# Examples:
-python3 server.py example.com
-python3 server.py amazon.com --port 5003
-```
-
-## Setup Instructions
-
-1. **Install Dependencies**:
+1. Clone the repository
+2. Install dependencies:
    ```bash
    pip install -r requirements.txt
    ```
 
-2. **Install ngrok** (if not already installed):
-   ```bash
-   # macOS
-   brew install ngrok
-   
-   # Or download from https://ngrok.com/
-   ```
+## Usage
 
-3. **Install concurrently** (for the Makefile):
-   ```bash
-   npm install -g concurrently
-   ```
+### Starting the Server
 
-4. **Start the Proxy**:
-   ```bash
-   make start TARGET=example.com
-   ```
+```bash
+# Start the proxy server (requires ngrok to be running)
+make start TARGET=example.com
 
-5. **Configure DNS/Hosts**:
-   - The tool will output the ngrok URL
-   - Add the ngrok hostname to your `/etc/hosts` file:
-     ```
-     127.0.0.1 <ngrok-hostname>
-     ```
-
-## Features
-
-### URL Rewriting
-- Rewrites absolute URLs in HTML responses
-- Handles protocol-relative URLs (`//example.com`)
-- Processes CSS and JavaScript files
-
-### Cookie Management
-- Rewrites `Set-Cookie` domain attributes
-- Preserves cookie functionality across the proxy
-
-### Header Handling
-- Removes problematic headers (Content-Length, Transfer-Encoding)
-- Strips CORS headers that might interfere
-- Maintains other headers for compatibility
-
-### Logging
-- Logs all requests with method, path, status code, and response size
-- Provides real-time feedback on proxy activity
-
-## Security Considerations
-
-⚠️ **Warning**: This tool is for educational and testing purposes only.
-
-- **Legal Use**: Only use against domains you own or have explicit permission to test
-- **Ethical Testing**: Respect robots.txt and rate limits
-- **No Malicious Use**: Do not use for phishing or other malicious activities
-
-## Technical Details
-
-### Port Configuration
-- Default proxy port: 5002
-- ngrok tunnel: HTTP on port 5002
-- Target: HTTPS requests to specified hostname
-
-### Content Types Handled
-- `text/html`
-- `text/css` 
-- `application/javascript`
-
-### Error Handling
-- Graceful handling of connection errors
-- Detailed error logging
-- Fallback responses for failed requests
-
-## Troubleshooting
-
-### Common Issues
-
-1. **ngrok not found**:
-   ```bash
-   # Install ngrok
-   brew install ngrok
-   ```
-
-2. **Port already in use**:
-   ```bash
-   # Use a different port
-   python3 server.py example.com --port 5003
-   ```
-
-3. **SSL certificate errors**:
-   - The proxy uses HTTPS for target requests
-   - Ensure your system trusts the target's SSL certificate
-
-4. **Hosts file not working**:
-   ```bash
-   # Flush DNS cache
-   sudo dscacheutil -flushcache
-   ```
-
-## Example Output
-
+# Or run directly
+python3 server.py example.com
 ```
-Ngrok URL: https://abc123.ngrok.io
-Proxying requests to: example.com
-Proxy running on port: 5002
-Add to /etc/hosts: 127.0.0.1 abc123.ngrok.io
-==================================================
-GET / -> 200 (15432 bytes)
-GET /static/css/main.css -> 200 (2048 bytes)
-POST /login -> 302 (0 bytes)
+
+### Running Tests
+
+```bash
+# Run all tests
+make test
+
+# Run unit tests only
+make test-unit
+
+# Run server flow tests only
+make test-server-flow
 ```
+
+### Manual Testing
+
+1. Start ngrok: `ngrok http 5002`
+2. Start the proxy: `python3 server.py example.com`
+3. Add the ngrok domain to `/etc/hosts`: `127.0.0.1 <ngrok-domain>`
+4. Access the proxy through the ngrok URL
+
+## How It Works
+
+1. **Request Processing**: The server receives requests and forwards them to the target host
+2. **Response Processing**: Responses are processed to rewrite URLs and extract cookies
+3. **Cookie Rewriting**: Cookie domains are rewritten from the target host to the proxy host
+4. **Response Delivery**: The modified response is sent back to the client
+
+## Testing
+
+The project includes comprehensive tests:
+
+- **Unit Tests**: Test individual components like cookie parsing and rewriting
+- **Integration Tests**: Test the complete server flow with mocked responses
+- **Cookie Extraction Tests**: Test the extraction of cookies from requests.Response objects
+
+## Development
+
+### Adding New Tests
+
+1. Create test files in the `tests/` directory
+2. Use the `run_tests.py` script to run tests with proper Python path setup
+3. Follow the existing test patterns for consistency
+
+### Code Structure
+
+- **CookieRewriter**: Handles cookie parsing, domain rewriting, and serialization
+- **ReverseProxy**: Manages request/response proxying and URL rewriting
+- **HostRewriteServer**: Flask server implementation with route handling
+
+## Dependencies
+
+- Flask: Web framework
+- Requests: HTTP client for proxying
+- concurrently: For running ngrok and server simultaneously (optional)
 
 ## License
 
-This tool is provided for educational purposes only. Use responsibly and in accordance with applicable laws and regulations. 
+This project is part of the security_poc repository and is for educational/demonstration purposes.
