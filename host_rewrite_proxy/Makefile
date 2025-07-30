@@ -12,7 +12,9 @@ stop:
 	@pkill -f "python3 server.py" || true
 
 # Run all tests
-test: test-unit test-reverse-proxy test-server
+test:
+	@echo "🧪 Running all tests..."
+	@PYTHONPATH=src python3 -m unittest discover -v tests
 	@echo "✅ All tests completed!"
 
 # Run unit tests

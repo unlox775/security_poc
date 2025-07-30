@@ -15,8 +15,18 @@ class ProxyResponse:
 
     @classmethod
     def from_requests(cls, response: RequestsResponse) -> 'ProxyResponse':
-        # Extract raw headers preserving multiple Set-Cookie entries
-        raw_headers = [(k, v) for k, v in response.raw.headers.items()]
+        """
+        Build ProxyResponse from a requests.Response, preserving all raw HTTP headers
+        (including duplicates and original case) if available.
+        """
+        # Prefer low-level HTTPMessage headers to preserve duplicates and case
+        orig_resp = getattr(response.raw, '_original_response', None)
+        if orig_resp and hasattr(orig_resp, 'headers'):
+            # HTTPMessage.headers is a list-like preserving duplicates
+            header_items = orig_resp.headers.items()
+        else:
+            header_items = response.raw.headers.items()
+        raw_headers = [(k, v) for k, v in header_items]
         # Stream the content in chunks
         body_stream = response.iter_content(chunk_size=8192)
         return cls(

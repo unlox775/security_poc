@@ -29,74 +29,60 @@ class HTTPDummyHandler(BaseHTTPRequestHandler):
         pass
 
 class TestProxyResponse(unittest.TestCase):
-    def test_from_requests_preserves_raw_headers_and_streaming(self):
-        # Simulate upstream HTTP response with multiple Set-Cookie headers
-        raw = HTTPResponse(
-            body=b'hello world',
-            status=200,
-            headers=[
-                ('Set-Cookie', 'c1=v1'),
-                ('Set-Cookie', 'c2=v2'),
-                ('X-Test', 'value')
-            ]
-        )
+    def make_dummy_response(self, headers, body=b'hello world'):
+        """Helper to create a Response with given raw headers and body."""
+        from types import SimpleNamespace
+        raw = HTTPResponse(body=body, status=200, headers=headers)
         resp = Response()
         resp.raw = raw
-        resp.status_code = 200
-        resp._content = b'hello world'
-        # Override iter_content to yield the buffered content, avoiding raw.stream issues
-        resp.iter_content = lambda chunk_size=8192, decode_content=True: iter([resp._content])
-        # Use from_requests to build ProxyResponse
-        pr = ProxyResponse.from_requests(resp)
+        # Attach an original_response stub to preserve insertion order, including duplicates
+        resp.raw._original_response = SimpleNamespace(
+            headers=SimpleNamespace(items=lambda: headers)
+        )
+        resp.status_code = raw.status
+        resp.iter_content = lambda chunk_size, decode_content=True: iter([body])
+        return resp, raw
+
+    def test_from_requests_preserves_raw_headers_and_streaming(self):
+        # Simulate upstream HTTP response with multiple Set-Cookie headers
+        headers = [
+            ('Set-Cookie', 'c1=v1'),
+            ('X-Test', 'value'),
+            ('Set-Cookie', 'c2=v2'),
+        ]
+        raw_response, raw = self.make_dummy_response(headers)
+        px_response = ProxyResponse.from_requests(raw_response)
         # Status code preserved
-        self.assertEqual(pr.status_code, 200)
-        # Check that raw.headers.items() are preserved in order
-        expected = list(raw.headers.items())
-        self.assertEqual(pr.headers, expected)
-        # Streaming body yields correct content in one chunk
-        chunks = list(pr.body_stream)
-        self.assertEqual(b''.join(chunks), b'hello world')
-        # Default iter_content chunk size produces one complete chunk
+        self.assertEqual(px_response.status_code, 200)
+        # Explicitly check header order and values (preserve original interleaving)
+        self.assertEqual(px_response.headers[0], ('Set-Cookie', 'c1=v1'))
+        self.assertEqual(px_response.headers[1], ('X-Test', 'value'))
+        self.assertEqual(px_response.headers[2], ('Set-Cookie', 'c2=v2'))
+        # Streaming yields exactly one chunk equal to the body
+        chunks = list(px_response.body_stream)
         self.assertEqual(chunks, [b'hello world'])
     
     def test_translate_headers_rewrites_cookies(self):
-        # Simulate HTTPResponse with multiple Set-Cookie headers and HTML body
-        raw = HTTPResponse(
-            body=b'<a href="http://original.com/path">link</a>',
-            status=200,
-            headers=[
-                ('Set-Cookie', 'sess=abc; domain=original.com; path=/'),
-                ('Set-Cookie', 'user=1; path=/'),
-                ('Content-Type', 'text/html')
-            ]
-        )
-        resp = Response()
-        resp.raw = raw
-        resp.status_code = 200
-        content = b'<a href="http://original.com/path">link</a>'
-        resp._content = content
-        resp.iter_content = lambda chunk_size, decode_content=True: iter([content])
-        pr = ProxyResponse.from_requests(resp)
-        pr.translate_headers('original.com', 'proxy.com')
-        cookies = [v for k, v in pr.headers if k.lower() == 'set-cookie']
+        # Rewrite domains in Set-Cookie headers
+        headers = [
+            ('Set-Cookie', 'sess=abc; domain=original.com; path=/'),
+            ('Set-Cookie', 'user=1; path=/'),
+            ('Content-Type', 'text/html'),
+        ]
+        resp, _ = self.make_dummy_response(headers)
+        px_response = ProxyResponse.from_requests(resp)
+        px_response.translate_headers('original.com', 'proxy.com')
+        cookies = [v for k, v in px_response.headers if k.lower() == 'set-cookie']
         self.assertIn('sess=abc; Path=/; Domain=proxy.com', cookies[0])
         self.assertIn('user=1; Path=/', cookies[1])
 
     def test_translate_content_rewrites_urls(self):
-        # Simulate HTTPResponse with body containing URLs
-        raw = HTTPResponse(
-            body=b'<a href="http://original.com/path">link</a>',
-            status=200,
-            headers=[('Content-Type', 'text/html')]
-        )
-        resp = Response()
-        resp.raw = raw
-        resp.status_code = 200
+        # Rewrite URLs in body fragments
         content = b'<a href="http://original.com/path">link</a>'
-        resp._content = content
-        resp.iter_content = lambda chunk_size, decode_content=True: iter([content])
-        pr = ProxyResponse.from_requests(resp)
-        chunks = list(pr.translate_content('original.com', 'proxy.com'))
+        headers = [('Content-Type', 'text/html')]
+        resp, _ = self.make_dummy_response(headers, body=content)
+        px_response = ProxyResponse.from_requests(resp)
+        chunks = list(px_response.translate_content('original.com', 'proxy.com'))
         output = b''.join(chunks)
         self.assertIn(b'https://proxy.com/path', output)
         self.assertNotIn(b'http://original.com', output)
@@ -111,18 +97,21 @@ class TestProxyResponseIntegration(unittest.TestCase):
         time.sleep(0.1)
 
     def tearDown(self):
+        # Cleanly shutdown HTTP server and close socket
         self.server.shutdown()
+        self.server.server_close()
+        self.thread.join(timeout=1)
 
     def test_integration_multi_chunk(self):
         url = f'http://127.0.0.1:{self.port}/'
         resp = requests.get(url, stream=True)
-        pr = ProxyResponse.from_requests(resp)
+        px_response = ProxyResponse.from_requests(resp)
         # Status code and headers
-        self.assertEqual(pr.status_code, 200)
+        self.assertEqual(px_response.status_code, 200)
         expected_headers = list(resp.raw.headers.items())
-        self.assertEqual(pr.headers, expected_headers)
+        self.assertEqual(px_response.headers, expected_headers)
         # Body should stream in default chunk_size 8192
-        chunks = list(pr.body_stream)
+        chunks = list(px_response.body_stream)
         self.assertEqual(len(chunks), math.ceil(15000 / 8192))
         self.assertEqual(b''.join(chunks), b'x' * 15000)
     
@@ -149,18 +138,30 @@ class TestProxyResponseIntegration(unittest.TestCase):
         time.sleep(0.1)
         url = f'http://127.0.0.1:{port}/'
         resp = requests.get(url, stream=True)
-        pr = ProxyResponse.from_requests(resp)
-        # Raw headers should match exactly from requests
-        expected_raw = list(resp.raw.headers.items())
-        self.assertEqual(pr.headers, expected_raw)
+        px_response = ProxyResponse.from_requests(resp)
+        # Skip default Server and Date headers
+        hdrs = px_response.headers
+        # Find where our custom headers start (first X-A)
+        start = next(i for i, (k, _) in enumerate(hdrs) if k == 'X-A')
+        expected = [
+            ('X-A', 'val1'),
+            ('x-a', 'val2'),
+            ('Set-Cookie', 'c1=1; domain=example.com; path=/'),
+            ('Set-Cookie', 'c2=2; path=/'),
+            ('X-B', 'val3'),
+            ('Content-Length', '4'),
+        ]
+        self.assertEqual(hdrs[start:start+len(expected)], expected)
         # Now rewrite cookies domains
-        pr.translate_headers('example.com', 'proxy.com')
+        px_response.translate_headers('example.com', 'proxy.com')
         # Extract rewritten Set-Cookie values
-        cookies = [v for k, v in pr.headers if k.lower() == 'set-cookie']
+        cookies = [v for k, v in px_response.headers if k.lower() == 'set-cookie']
         # c1 should have domain rewritten, c2 should preserve path only
         self.assertIn('c1=1; Path=/; Domain=proxy.com', cookies[0])
         self.assertIn('c2=2; Path=/', cookies[1])
         server.shutdown()
+        server.server_close()
+        thread.join(timeout=1)
 
 if __name__ == '__main__':
     unittest.main(verbosity=2) 
