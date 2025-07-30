@@ -3,6 +3,7 @@ import re
 import sys
 from typing import Dict, Any
 from .cookie_rewriter import CookieRewriter
+from . import bug
 
 class ReverseProxy:
     def __init__(self, target_host: str, proxy_host: str):
@@ -74,6 +75,9 @@ class ReverseProxy:
             
             # Get response content
             content = response.content
+
+            # for n, v in response.raw.headers.items():
+            #     bug(f'{n}: {v}')
             
             # Rewrite URLs in the response content
             if response.headers.get('content-type', '').startswith(('text/html', 'text/css', 'application/javascript')):
@@ -88,11 +92,16 @@ class ReverseProxy:
             print(f"{request_method} {request_path} -> {response.status_code} ({len(content)} bytes)")
             sys.stdout.flush()
             
-            return content, response.status_code, response_headers, response.raw.headers
+            # Try to pass the low-level HTTPMessage headers if available to preserve multiple Set-Cookie entries
+            orig_resp = getattr(response.raw, '_original_response', None)
+            orig_headers = getattr(orig_resp, 'headers', response.raw.headers)
+            bug([content, response.status_code, response_headers, orig_headers])
+            return content, response.status_code, response_headers, orig_headers
             
         except Exception as e:
             print(f"Error proxying request: {str(e)}")
-            return f"Proxy error: {str(e)}".encode('utf-8'), 500, {}
+            # Return 4 values: content, status_code, response_headers, original_headers
+            return f"Proxy error: {str(e)}".encode('utf-8'), 500, {}, {}
     
     def process_cookies(self, response_headers, flask_response):
         """Process cookies from the response and set them on the Flask response"""

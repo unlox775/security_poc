@@ -3,6 +3,7 @@
 import re
 from datetime import datetime
 from typing import List, Dict, Any
+
 from . import bug
 
 class CookieRewriter:
@@ -177,11 +178,10 @@ class CookieRewriter:
         if not set_cookie_key:
             return
             
-        # Get original cookies - extract all Set-Cookie headers properly
+        # Get original cookies - prefer using get_all if available to preserve multiple headers
         original_cookies = []
         for key, value in response_headers.items():
             if key.lower() == 'set-cookie':
-                # Handle both single string and list of strings
                 if isinstance(value, list):
                     original_cookies.extend(value)
                 else:
@@ -197,50 +197,11 @@ class CookieRewriter:
             self._set_cookie_from_string(flask_response, cookie_string)
     
     def _set_cookie_from_string(self, flask_response, cookie_string):
-        """Parse a cookie string and set it on the Flask response"""
+        """Set the Set-Cookie header directly to preserve original formatting (including quoted values and commas)."""
         if '=' not in cookie_string:
             return
-            
-        # Parse the cookie string using our existing parser
-        cookie_data = self.parse_cookie_string(cookie_string)
-        if not cookie_data:
-            return
-            
-        # Rewrite the domain if needed
-        rewritten_data = self.rewrite_cookie_domain(cookie_data)
-        
-        # Extract name and value
-        name = rewritten_data.get('name', '').strip()
-        value = rewritten_data.get('value', '').strip()
-        
-        # Get attributes for Flask
-        attrs = rewritten_data.get('attrs', {})
-        
-        # Convert max-age if present
-        max_age = attrs.get('max-age')
-        if max_age and str(max_age).isdigit():
-            attrs['max_age'] = int(max_age)
-            attrs.pop('max-age', None)
-        else:
-            attrs.pop('max-age', None)
-            
-        # Handle expires conversion if no max-age
-        expires = attrs.get('expires')
-        if expires and 'max_age' not in attrs:
-            try:
-                for fmt in ['%a, %d-%b-%Y %H:%M:%S GMT', '%a, %d %b %Y %H:%M:%S GMT']:
-                    try:
-                        expires_dt = datetime.strptime(expires, fmt)
-                        attrs['max_age'] = int((expires_dt - datetime.now()).total_seconds())
-                        break
-                    except ValueError:
-                        continue
-            except:
-                pass
-            attrs.pop('expires', None)
-        
-        # Set the cookie
-        flask_response.set_cookie(name, value, **attrs) 
+        flask_response.headers.add('Set-Cookie', cookie_string)
+    
     def _split_cookies(self, cookie_header) -> List[str]:
         """Split a cookie header into individual cookies, handling commas in dates"""
         # Handle case where cookie_header is already a list
