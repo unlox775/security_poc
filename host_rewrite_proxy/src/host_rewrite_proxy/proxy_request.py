@@ -2,6 +2,10 @@
 
 from typing import List, Tuple, Optional, Iterator
 from flask import Request as FlaskRequest
+try:
+    from quart import Request as QuartRequest
+except ImportError:
+    QuartRequest = None
 from requests.models import Response as RequestsResponse
 
 class ProxyRequest:
@@ -29,6 +33,25 @@ class ProxyRequest:
             method=flask_request.method,
             path=path,
             headers=headers,
+            body=body,
+            query_string=query_string
+        )
+
+    @classmethod
+    async def from_quart(cls, quart_request: QuartRequest) -> 'ProxyRequest':
+        """Extract raw headers and body from a Quart request in arrival order."""
+        if QuartRequest is None:
+            raise RuntimeError("QuartRequest not available; install quart to use this method.")
+        # Use ASGI scope to get raw headers in arrival order
+        hdrs = getattr(quart_request, 'scope', {}).get('headers', [])
+        raw = [(name.decode('latin-1'), value.decode('latin-1')) for name, value in hdrs]
+        body = await quart_request.get_data()
+        query_string = quart_request.query_string.decode() if quart_request.query_string else None
+        path = quart_request.path
+        return cls(
+            method=quart_request.method,
+            path=path,
+            headers=raw,
             body=body,
             query_string=query_string
         )

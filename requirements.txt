@@ -1,0 +1,2 @@
+responses>=0.23.0
+quart>=0.17.0 

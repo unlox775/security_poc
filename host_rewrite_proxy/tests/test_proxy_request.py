@@ -10,15 +10,16 @@ import socket
 import threading
 import time
 import requests
-from flask import Flask, request, jsonify
+from quart import Quart, request, jsonify
 from host_rewrite_proxy.proxy_request import ProxyRequest
+from unittest import IsolatedAsyncioTestCase
 
-class TestProxyRequestIntegration(unittest.TestCase):
+class TestProxyRequestIntegration(IsolatedAsyncioTestCase):
     def setUp(self):
-        self.app = Flask(__name__)
+        self.app = Quart(__name__)
         @self.app.route('/extract', methods=['GET', 'POST'])
-        def extract():
-            pr = ProxyRequest.from_flask(request)
+        async def extract():
+            pr = await ProxyRequest.from_quart(request)
             return jsonify({
                 'method': pr.method,
                 'path': pr.path,
@@ -26,48 +27,64 @@ class TestProxyRequestIntegration(unittest.TestCase):
                 'body': pr.body.decode('utf-8'),
                 'query_string': pr.query_string
             })
-        sock = socket.socket()
-        sock.bind(('127.0.0.1', 0))
-        port = sock.getsockname()[1]
-        sock.close()
-        self.port = port
-        self.server_thread = threading.Thread(
-            target=self.app.run,
-            kwargs={'host': '127.0.0.1', 'port': port, 'debug': False, 'use_reloader': False},
-            daemon=True
-        )
-        self.server_thread.start()
-        print(f'Server started on port {self.port}')
-        time.sleep(0.5)
 
     def tearDown(self):
-        # Daemon thread exits automatically
         pass
 
-    def test_integration_get(self):
-        url = f'http://127.0.0.1:{self.port}/extract?x=1&y=2'
-        headers = {'X-Test': 'value', 'Cookie': 'a=b; c=d'}
-        print(f'Sending GET request to {url} with headers {headers}')
-        resp = requests.get(url, headers=headers)
-        data = resp.json()
+    async def test_integration_get(self):
+        async with self.app.test_client() as client:
+            url = '/extract?x=1&y=2'
+            headers = [('X-Test', 'value'), ('Cookie', 'a=b; c=d')]
+            print(f"\nSending GET request: {url} with headers {headers}\n")
+            resp = await client.get(url, headers=headers)
+            data = await resp.get_json()
         self.assertEqual(data['method'], 'GET')
         self.assertEqual(data['path'], '/extract')
         self.assertEqual(data['query_string'], 'x=1&y=2')
-        self.assertIn(['X-Test', 'value'], data['headers'])
-        self.assertIn(['Cookie', 'a=b; c=d'], data['headers'])
+        self.assertIn(['x-test', 'value'], data['headers'])
+        self.assertIn(['cookie', 'a=b; c=d'], data['headers'])
         self.assertEqual(data['body'], '')
 
-    def test_integration_post(self):
-        url = f'http://127.0.0.1:{self.port}/extract'
-        headers = {'X-Post': 'yes'}
-        print(f'Sending POST request to {url} with headers {headers}')
-        resp = requests.post(url, headers=headers, data='hello')
-        data = resp.json()
+    async def test_integration_post(self):
+        async with self.app.test_client() as client:
+            resp = await client.post('/extract', headers=[('X-Post', 'yes')], data=b'hello')
+            data = await resp.get_json()
         self.assertEqual(data['method'], 'POST')
         self.assertEqual(data['path'], '/extract')
         self.assertIsNone(data['query_string'])
-        self.assertIn(['X-Post', 'yes'], data['headers'])
+        self.assertIn(['x-post', 'yes'], data['headers'])
         self.assertEqual(data['body'], 'hello')
+
+    async def test_integration_duplicate_headers(self):
+        async with self.app.test_client() as client:
+            headers = [
+                ('X-Multi', 'first'),
+                ('X-Foo', 'bar'),
+                ('X-Multi', 'second'),
+                ('x-Multi', 'third'),
+                ('cookie', 'a=b; c=d'),
+                ('X-Multi', 'fourth'),
+                ('X-Multi', 'fifth'),
+                ('Cookie', 'e=f; g=h'),
+                ]
+            resp = await client.get('/extract?dup=1', headers=headers)
+            data = await resp.get_json()
+        # Raw headers list preserved
+        values = [h[1] for h in data['headers'] if h[0] == 'x-multi']
+
+        # Verify exact ordering and raw values (lowercased header names and list format)
+        expected = [
+            ['x-multi', 'first'],
+            ['x-foo', 'bar'],
+            ['x-multi', 'second'],
+            ['x-multi', 'third'],
+            ['cookie', 'a=b; c=d'],
+            ['x-multi', 'fourth'],
+            ['x-multi', 'fifth'],
+            ['cookie', 'e=f; g=h'],
+        ]
+        # Only check the first N entries to avoid default headers (user-agent, host)
+        self.assertEqual(data['headers'][:len(expected)], expected)
 
 class TestProxyRequestUnit(unittest.TestCase):
     def test_translate_rewrites_and_filters_headers(self):

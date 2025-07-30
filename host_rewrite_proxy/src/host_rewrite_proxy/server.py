@@ -19,7 +19,8 @@ class HostRewriteServer:
         @self.app.route('/<path:path>')
         def proxy_request(path):
             # Get request data
-            data = request.get_data()
+            # Stream incoming body to avoid buffering large requests
+            data = request.environ.get('wsgi.input')
             query_string = request.query_string.decode() if request.query_string else None
             
             # Process the request through the reverse proxy
