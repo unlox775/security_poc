@@ -96,31 +96,4 @@ class ProxyRequest:
                 continue
             else:
                 new_headers.append((key, value))
-        self.headers = new_headers
-
-class ProxyResponse:
-    """Represents the response from the upstream server in a streamable form."""
-    def __init__(self,
-                 status_code: int,
-                 headers: List[Tuple[str, str]],
-                 body_stream: Iterator[bytes]):
-        self.status_code = status_code
-        self.headers = headers
-        self.body_stream = body_stream
-
-    @classmethod
-    def from_requests(cls, response: RequestsResponse) -> 'ProxyResponse':
-        # Extract raw headers preserving multiple Set-Cookie entries
-        raw_headers = [(k, v) for k, v in response.raw.headers.items()]
-        # Stream the content in chunks
-        body_stream = response.iter_content(chunk_size=8192)
-        return cls(
-            status_code=response.status_code,
-            headers=raw_headers,
-            body_stream=body_stream
-        )
-
-    def translate(self, proxy_host: str) -> None:
-        """Apply translation logic (cookie rewriting, URL rewriting) to headers."""
-        # TODO: integrate CookieRewriter and URL rewriting here
-        pass 
+        self.headers = new_headers 
