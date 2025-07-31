@@ -51,9 +51,9 @@ class HostRewriteServer:
             px_resp.translate_headers(self.target_host, self.proxy_host)
             print(f"DEBUG: px_resp: {px_resp}")
             
-            # Remove Content-Encoding header since we're decompressing
+            # Remove Content-Encoding and Content-Length headers since we're modifying content
             px_resp.headers = [(name, value) for name, value in px_resp.headers 
-                              if name.lower() != 'content-encoding']
+                              if name.lower() not in ['content-encoding', 'content-length']]
             
             # Create async generator for streaming content
             async def stream_content():
@@ -74,28 +74,43 @@ class HostRewriteServer:
                     rel_pattern = re.compile(rf'//{re.escape(self.target_host)}', flags=re.IGNORECASE)
                     
                     if is_gzipped:
-                        # Collect all chunks and decompress
-                        all_data = b''
-                        while True:
-                            try:
-                                chunk = await loop.run_in_executor(None, lambda: next(px_resp.body_stream))
-                                all_data += chunk
-                            except StopIteration:
-                                break
-                            except Exception as e:
-                                print(f"Error reading chunk: {e}")
-                                break
-                        
-                        # Decompress and process
+                        # Read the entire response content at once
                         try:
+                            all_data = await loop.run_in_executor(None, lambda: resp.content)
+                            print(f"DEBUG: Read {len(all_data)} bytes of gzipped content")
+                            
+                            # Decompress and process
                             decompressed = gzip.decompress(all_data)
+                            print(f"DEBUG: Decompressed to {len(decompressed)} bytes")
                             text = decompressed.decode('utf-8', errors='ignore')
                             text = abs_pattern.sub(f'https://{self.proxy_host}', text)
                             text = rel_pattern.sub(f'//{self.proxy_host}', text)
                             yield text.encode('utf-8')
                         except Exception as e:
-                            print(f"Error decompressing: {e}")
-                            yield all_data
+                            print(f"Error processing gzipped content: {e}")
+                            # Fallback: try to read chunks manually
+                            all_data = b''
+                            while True:
+                                try:
+                                    chunk = await loop.run_in_executor(None, lambda: next(px_resp.body_stream))
+                                    all_data += chunk
+                                    print(f"DEBUG: Read chunk of {len(chunk)} bytes, total: {len(all_data)}")
+                                except StopIteration:
+                                    break
+                                except Exception as e:
+                                    print(f"Error reading chunk: {e}")
+                                    break
+                            
+                            if all_data:
+                                try:
+                                    decompressed = gzip.decompress(all_data)
+                                    text = decompressed.decode('utf-8', errors='ignore')
+                                    text = abs_pattern.sub(f'https://{self.proxy_host}', text)
+                                    text = rel_pattern.sub(f'//{self.proxy_host}', text)
+                                    yield text.encode('utf-8')
+                                except Exception as e:
+                                    print(f"Error decompressing fallback: {e}")
+                                    yield all_data
                     else:
                         # Stream non-gzipped content
                         while True:
