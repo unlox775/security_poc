@@ -57,14 +57,21 @@ class CookieRewriter:
             f'www.{self.target_host}',
             f'.www.{self.target_host}'
         ]
-        # Add to the array, as we chop off the first part of the domain, until we get to the top level domain (which we don't add to the array)
+        # Add parent domains (but not top-level domains like .com)
+        # For example.com, also match example.com, but NOT .com
         chop_domain = self.target_host
-        while chop_domain.count('.') > 0:
+        while chop_domain.count('.') > 1:  # Stop before we get to top-level domain
             chop_domain = chop_domain.split('.', 1)[1]
             domains_needing_rewrite.append(chop_domain)
             domains_needing_rewrite.append(f'.{chop_domain}')
 
+        # Check exact matches first
         if domain in domains_needing_rewrite:
+            return True
+            
+        # Check if it's a subdomain of the target host
+        # For example.com, also match api.example.com, sub.example.com, etc.
+        if domain.endswith(f'.{self.target_host}'):
             return True
 
         return False
