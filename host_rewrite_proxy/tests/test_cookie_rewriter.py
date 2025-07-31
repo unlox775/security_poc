@@ -141,9 +141,12 @@ class TestCookieRewriter(unittest.TestCase):
         self.assertNotIn('example.com', result[0])
     
     def test_rewrite_multiple_cookies_in_header(self):
-        """Test rewriting multiple cookies in one header"""
+        """Test rewriting multiple cookies in separate headers"""
         # Arrange
-        cookie_headers = ["session=ABC123; Domain=example.com; Path=/; Secure, user=DEF456; Domain=example.com; Path=/; HttpOnly"]
+        cookie_headers = [
+            "session=ABC123; Domain=example.com; Path=/; Secure",
+            "user=DEF456; Domain=example.com; Path=/; HttpOnly"
+        ]
         
         # Act
         result = self.rewriter.rewrite_cookies(cookie_headers)
@@ -199,33 +202,61 @@ class TestCookieRewriter(unittest.TestCase):
             self.assertNotIn('Domain=', cookie)
             self.assertNotIn('example.com', cookie)
     
-    def test_split_cookies(self):
-        """Test splitting multiple cookies in one header"""
+    def test_rewrite_cookies_with_www_domain(self):
+        """Test rewriting cookies with www subdomain"""
         # Arrange
-        cookie_header = "session=ABC123; Domain=example.com; Path=/; Secure, user=DEF456; Domain=example.com; Path=/; HttpOnly"
+        cookie_headers = ["session=ABC123; Domain=www.example.com; Path=/; Secure"]
         
         # Act
-        result = self.rewriter._split_cookies(cookie_header)
+        result = self.rewriter.rewrite_cookies(cookie_headers)
         
         # Assert
-        self.assertEqual(len(result), 2)
+        self.assertEqual(len(result), 1)
         self.assertIn('session=ABC123', result[0])
-        self.assertIn('user=DEF456', result[1])
+        self.assertIn(f'Domain={self.proxy_host}', result[0])
+        self.assertNotIn('www.example.com', result[0])
     
-    def test_split_cookies_with_commas_in_dates(self):
-        """Test splitting cookies when dates contain commas"""
+    def test_rewrite_cookies_with_dot_domain(self):
+        """Test rewriting cookies with dot-prefixed domain"""
         # Arrange
-        cookie_header = "session=ABC123; Domain=example.com; Expires=Wed, 30-Jul-2025 00:07:41 GMT; Path=/; Secure, user=DEF456; Domain=example.com; Path=/; HttpOnly"
+        cookie_headers = ["session=ABC123; Domain=.example.com; Path=/; Secure"]
         
         # Act
-        result = self.rewriter._split_cookies(cookie_header)
+        result = self.rewriter.rewrite_cookies(cookie_headers)
         
         # Assert
-        self.assertEqual(len(result), 2)
+        self.assertEqual(len(result), 1)
         self.assertIn('session=ABC123', result[0])
-        self.assertIn('user=DEF456', result[1])
-        # Verify the date wasn't split
-        self.assertIn('Wed, 30-Jul-2025 00:07:41 GMT', result[0])
+        self.assertIn(f'Domain={self.proxy_host}', result[0])
+        self.assertNotIn('.example.com', result[0])
+    
+    def test_rewrite_cookies_with_subdomain(self):
+        """Test rewriting cookies with subdomain"""
+        # Arrange
+        cookie_headers = ["session=ABC123; Domain=api.example.com; Path=/; Secure"]
+        
+        # Act
+        result = self.rewriter.rewrite_cookies(cookie_headers)
+        
+        # Assert
+        self.assertEqual(len(result), 1)
+        self.assertIn('session=ABC123', result[0])
+        self.assertIn(f'Domain={self.proxy_host}', result[0])
+        self.assertNotIn('api.example.com', result[0])
+    
+    def test_rewrite_cookies_with_parent_domain(self):
+        """Test rewriting cookies with parent domain (should not rewrite)"""
+        # Arrange
+        cookie_headers = ["session=ABC123; Domain=com; Path=/; Secure"]
+        
+        # Act
+        result = self.rewriter.rewrite_cookies(cookie_headers)
+        
+        # Assert
+        self.assertEqual(len(result), 1)
+        self.assertIn('session=ABC123', result[0])
+        self.assertIn('Domain=com', result[0])  # Should not be rewritten
+        self.assertNotIn(f'Domain={self.proxy_host}', result[0])
 
 
 if __name__ == '__main__':

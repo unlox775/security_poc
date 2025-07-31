@@ -50,17 +50,103 @@ class HostRewriteServer:
             print(f"DEBUG: px_resp: {px_resp}")
             px_resp.translate_headers(self.target_host, self.proxy_host)
             print(f"DEBUG: px_resp: {px_resp}")
+            
+            # Remove Content-Encoding header since we're decompressing
+            px_resp.headers = [(name, value) for name, value in px_resp.headers 
+                              if name.lower() != 'content-encoding']
+            
+            # Create async generator for streaming content
+            async def stream_content():
+                try:
+                    loop = asyncio.get_event_loop()
+                    import re
+                    import gzip
+                    import io
+                    
+                    # Check if content is gzipped
+                    is_gzipped = any(
+                        name.lower() == 'content-encoding' and 'gzip' in value.lower()
+                        for name, value in px_resp.headers
+                    )
+                    
+                    # Compile patterns for URL rewriting
+                    abs_pattern = re.compile(rf'https?://{re.escape(self.target_host)}', flags=re.IGNORECASE)
+                    rel_pattern = re.compile(rf'//{re.escape(self.target_host)}', flags=re.IGNORECASE)
+                    
+                    if is_gzipped:
+                        # Collect all chunks and decompress
+                        all_data = b''
+                        while True:
+                            try:
+                                chunk = await loop.run_in_executor(None, lambda: next(px_resp.body_stream))
+                                all_data += chunk
+                            except StopIteration:
+                                break
+                            except Exception as e:
+                                print(f"Error reading chunk: {e}")
+                                break
+                        
+                        # Decompress and process
+                        try:
+                            decompressed = gzip.decompress(all_data)
+                            text = decompressed.decode('utf-8', errors='ignore')
+                            text = abs_pattern.sub(f'https://{self.proxy_host}', text)
+                            text = rel_pattern.sub(f'//{self.proxy_host}', text)
+                            yield text.encode('utf-8')
+                        except Exception as e:
+                            print(f"Error decompressing: {e}")
+                            yield all_data
+                    else:
+                        # Stream non-gzipped content
+                        while True:
+                            try:
+                                chunk = await loop.run_in_executor(None, lambda: next(px_resp.body_stream))
+                                
+                                # Translate the chunk inline
+                                try:
+                                    text = chunk.decode('utf-8', errors='ignore')
+                                    text = abs_pattern.sub(f'https://{self.proxy_host}', text)
+                                    text = rel_pattern.sub(f'//{self.proxy_host}', text)
+                                    translated_chunk = text.encode('utf-8')
+                                except Exception:
+                                    # Non-text or decode error; pass through raw bytes
+                                    translated_chunk = chunk
+                                
+                                yield translated_chunk
+                            except StopIteration:
+                                break
+                            except Exception as e:
+                                print(f"Error reading chunk: {e}")
+                                break
+                except Exception as e:
+                    print(f"Error in stream_content: {e}")
+                    yield b''
+            
             # Stream translated content back to client
             return Response(
-                px_resp.translate_content(self.target_host, self.proxy_host),
+                stream_content(),
                 status=px_resp.status_code,
                 headers=px_resp.headers
             )
     
     def run(self):
         """Serve the Quart app via built-in async run"""
+        # Workaround for Quart's signal handling in threaded environments
+        import signal
+        import os
+        
+        # Disable signal handling if not in main thread
+        if os.getpid() != os.getppid():  # Simple check for non-main thread
+            try:
+                # Monkey patch signal handling to no-op
+                def noop_signal_handler(*args, **kwargs):
+                    pass
+                signal.signal = noop_signal_handler
+            except:
+                pass
+        
         # Quart's run will start the ASGI server
-        self.app.run(host='0.0.0.0', port=self.port, debug=True)
+        self.app.run(host='0.0.0.0', port=self.port, debug=False)
 
 def get_ngrok_url():
     """Get the ngrok public URL from the ngrok API"""

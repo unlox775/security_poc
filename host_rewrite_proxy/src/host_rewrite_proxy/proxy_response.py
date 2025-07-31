@@ -4,6 +4,8 @@ from typing import List, Tuple, Iterator
 from requests.models import Response as RequestsResponse
 import re
 
+from . import bug
+
 class ProxyResponse:
     """Represents the response from the upstream server in a streamable form."""
     def __init__(self,
@@ -38,20 +40,33 @@ class ProxyResponse:
 
     def translate_headers(self, origin_host: str, proxy_host: str) -> None:
         """Rewrite Set-Cookie headers using CookieRewriter, replacing domains from origin_host to proxy_host."""
-        from .cookie_rewriter import CookieRewriter
-        # Extract existing Set-Cookie header values
-        cookie_values = [v for (k, v) in self.headers if k.lower() == 'set-cookie']
-        # Rewrite cookies
-        rewriter = CookieRewriter(origin_host, proxy_host)
-        print(f"DEBUG: cookie_values: {cookie_values}")
-        rewritten = rewriter.rewrite_cookies(cookie_values)
-        print(f"DEBUG: rewritten: {rewritten}")
-        # Filter out old Set-Cookie entries
-        new_headers = [(k, v) for (k, v) in self.headers if k.lower() != 'set-cookie']
-        # Append rewritten Set-Cookie headers
-        for cookie in rewritten:
-            new_headers.append(('Set-Cookie', cookie))
-        self.headers = new_headers
+        # Extract and rewrite Set-Cookie headers
+        cookie_headers = []
+        for name, value in self.headers:
+            # print(f"DEBUG: name: {name}, value: {value}")
+            if name.lower() == 'set-cookie':
+                cookie_headers.append(value)
+        # bug(cookie_headers)
+        
+        if cookie_headers:
+            from .cookie_rewriter import CookieRewriter
+            rewriter = CookieRewriter(origin_host, proxy_host)
+            rewritten_cookies = rewriter.rewrite_cookies(cookie_headers)
+            # bug(rewritten_cookies)
+            
+            # Replace original Set-Cookie headers with rewritten ones
+            new_headers = []
+            for name, value in self.headers:
+                if name.lower() == 'set-cookie':
+                    # Skip original Set-Cookie headers
+                    continue
+                new_headers.append((name, value))
+            
+            # Add rewritten Set-Cookie headers
+            for cookie in rewritten_cookies:
+                new_headers.append(('Set-Cookie', cookie))
+            
+            self.headers = new_headers
 
     def translate_content(self, origin_host: str, proxy_host: str, chunk_size: int = 8192) -> Iterator[bytes]:
         """Stream and rewrite body chunks, applying URL rewriting per chunk."""

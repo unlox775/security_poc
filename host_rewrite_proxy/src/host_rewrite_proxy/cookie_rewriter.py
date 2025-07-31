@@ -47,14 +47,27 @@ class CookieRewriter:
             return False
             
         domain = domain.lower()
-        target_variations = [
-            self.target_host.lower(),
-            f'.{self.target_host.lower()}',
-            f'www.{self.target_host.lower()}',
-            f'.www.{self.target_host.lower()}'
+
+        # At least go down, don't remove the top level domain, the .com or whatever is at the end. Don't remove that, but go to at least one step of that one, because a lot of times people will go up several domains for cookie domains, and do like dot  that domain.
+        # E.g for foo.bar.baz.com, check foo.bar.baz.com, bar.baz.com, baz.com, but NOT .com
+        # Then we will add a . to each variation, and even add a www to just the original one, and then check all of those.
+        domains_needing_rewrite = [
+            self.target_host,
+            f'.{self.target_host}',
+            f'www.{self.target_host}',
+            f'.www.{self.target_host}'
         ]
-        
-        return domain in target_variations
+        # Add to the array, as we chop off the first part of the domain, until we get to the top level domain (which we don't add to the array)
+        chop_domain = self.target_host
+        while chop_domain.count('.') > 0:
+            chop_domain = chop_domain.split('.', 1)[1]
+            domains_needing_rewrite.append(chop_domain)
+            domains_needing_rewrite.append(f'.{chop_domain}')
+
+        if domain in domains_needing_rewrite:
+            return True
+
+        return False
     
     def rewrite_cookie_domain(self, cookie_data: Dict[str, Any]) -> Dict[str, Any]:
         """Rewrite the domain in a cookie if needed"""
@@ -102,6 +115,7 @@ class CookieRewriter:
         """Rewrite each Set-Cookie header value directly without splitting."""
         rewritten = []
         for header in cookie_headers:
+            # bug(header)
             data = self.parse_cookie_string(header)
             if not data:
                 continue
@@ -110,81 +124,4 @@ class CookieRewriter:
             if cookie_str:
                 rewritten.append(cookie_str)
         return rewritten
-    
-    # Removed cookie-splitting helpers; each header value is already a single Set-Cookie string
-    
-    def get_cookie_attrs_for_flask(self, cookie_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Convert cookie data to Flask set_cookie parameters"""
-        attrs = cookie_data.get('attrs', {})
-        
-        # Handle max-age conversion
-        max_age = attrs.get('max-age')
-        if max_age and str(max_age).isdigit():
-            max_age = int(max_age)
-        else:
-            max_age = None
-            
-        # Handle expires conversion
-        expires = attrs.get('expires')
-        if expires and not max_age:
-            try:
-                for fmt in ['%a, %d-%b-%Y %H:%M:%S GMT', '%a, %d %b %Y %H:%M:%S GMT']:
-                    try:
-                        expires_dt = datetime.strptime(expires, fmt)
-                        max_age = int((expires_dt - datetime.now()).total_seconds())
-                        break
-                    except ValueError:
-                        continue
-            except:
-                pass
-                
-        return {
-            'domain': attrs.get('domain', self.proxy_host),
-            'path': attrs.get('path', '/'),
-            'secure': attrs.get('secure', False),
-            'httponly': attrs.get('httponly', False),
-            'samesite': attrs.get('samesite', None),
-            'max_age': max_age
-        } 
 
-    def rewrite_cookies_and_set_on_response(self, response_headers, flask_response):
-        """
-        Rewrite all cookies from response headers and set them on the Flask response.
-        
-        Args:
-            response_headers: Headers from the upstream response
-            flask_response: Flask Response object to set cookies on
-        """
-        # Handle case-sensitive header matching
-        set_cookie_key = None
-        for key in response_headers.keys():
-            if key.lower() == 'set-cookie':
-                set_cookie_key = key
-                break
-        
-        if not set_cookie_key:
-            return
-            
-        # Get original cookies - prefer using get_all if available to preserve multiple headers
-        original_cookies = []
-        for key, value in response_headers.items():
-            if key.lower() == 'set-cookie':
-                if isinstance(value, list):
-                    original_cookies.extend(value)
-                else:
-                    original_cookies.append(value)
-        
-        # Rewrite all cookies
-        rewritten_cookies = self.rewrite_cookies(original_cookies)
-        bug(original_cookies)
-        bug(rewritten_cookies)
-        
-        # Set each rewritten cookie on the Flask response
-        for cookie_string in rewritten_cookies:
-            self._set_cookie_from_string(flask_response, cookie_string)
-    
-    def _set_cookie_from_string(self, flask_response, cookie_string):
-        """Set the Set-Cookie header directly to preserve original formatting (including quoted values and commas)."""
-        if '=' not in cookie_string:
-            return
-        flask_response.headers.add('Set-Cookie', cookie_string)
