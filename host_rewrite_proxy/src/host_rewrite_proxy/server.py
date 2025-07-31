@@ -24,6 +24,7 @@ class HostRewriteServer:
             bug("PROXYING - Method / Path", [request.method, path])
             # Parse incoming request into ProxyRequest (async via Quart)
             proxy_req = await ProxyRequest.from_quart(request)
+            bug("PROXY REQ METHOD", [proxy_req.method])
             proxy_req.translate(self.target_host)
             # Build target URL
             target_url = f"https://{self.target_host}/{path}"
@@ -31,18 +32,37 @@ class HostRewriteServer:
                 target_url += f"?{proxy_req.query_string}"
 
             # Forward request to upstream server
+            bug("SENDING REQUEST", [proxy_req.method, target_url])
+            # For POST requests, we need to handle the body properly
+            if proxy_req.method in ['POST', 'PUT', 'PATCH']:
+                # Read the body content for debugging
+                body_content = proxy_req.body_stream.read() if hasattr(proxy_req.body_stream, 'read') else b''
+                bug("BODY CONTENT LENGTH", [len(body_content)])
+                bug("BODY CONTENT", [body_content.decode('utf-8', errors='ignore') if body_content else ''])
+                # Reset stream position
+                if hasattr(proxy_req.body_stream, 'seek'):
+                    proxy_req.body_stream.seek(0)
+                # Use the body content directly instead of the stream
+                request_data = body_content
+            else:
+                request_data = None
+            
+            # Debug the headers we're sending
+            bug("SENDING HEADERS", [dict(proxy_req.headers)])
             resp = await asyncio.get_event_loop().run_in_executor(
                 None,
                 lambda: requests.request(
                     method=proxy_req.method,
                     url=target_url,
                     headers=dict(proxy_req.headers),
-                    data=proxy_req.body_stream,
+                    data=request_data,
                     stream=True,
                     verify=True,
                     allow_redirects=False
                 )
             )
+            bug("RESPONSE STATUS", [resp.status_code])
+            bug("RESPONSE HEADERS", [dict(resp.headers)])
             print(f"DEBUG: resp: {resp}")
 
             # Wrap and translate response

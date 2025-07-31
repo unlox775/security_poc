@@ -39,34 +39,56 @@ class ProxyResponse:
         )
 
     def translate_headers(self, origin_host: str, proxy_host: str) -> None:
-        """Rewrite Set-Cookie headers using CookieRewriter, replacing domains from origin_host to proxy_host."""
-        # Extract and rewrite Set-Cookie headers
-        cookie_headers = []
-        for name, value in self.headers:
-            # print(f"DEBUG: name: {name}, value: {value}")
-            if name.lower() == 'set-cookie':
-                cookie_headers.append(value)
-        # bug(cookie_headers)
+        """Rewrite Set-Cookie and Location headers, replacing domains from origin_host to proxy_host."""
+        new_headers = []
         
-        if cookie_headers:
-            from .cookie_rewriter import CookieRewriter
-            rewriter = CookieRewriter(origin_host, proxy_host)
-            rewritten_cookies = rewriter.rewrite_cookies(cookie_headers)
-            # bug(rewritten_cookies)
+        for name, value in self.headers:
+            lower_name = name.lower()
             
-            # Replace original Set-Cookie headers with rewritten ones
-            new_headers = []
-            for name, value in self.headers:
-                if name.lower() == 'set-cookie':
-                    # Skip original Set-Cookie headers
-                    continue
+            if lower_name == 'set-cookie':
+                # Handle Set-Cookie headers
+                cookie_headers = [value]
+                from .cookie_rewriter import CookieRewriter
+                rewriter = CookieRewriter(origin_host, proxy_host)
+                rewritten_cookies = rewriter.rewrite_cookies(cookie_headers)
+                
+                # Add rewritten Set-Cookie headers
+                for cookie in rewritten_cookies:
+                    new_headers.append(('Set-Cookie', cookie))
+                    
+            elif lower_name == 'location':
+                # Handle Location headers for redirects
+                try:
+                    from urllib.parse import urlparse, urlunparse
+                    parsed = urlparse(value)
+                    
+                    # If it's a relative URL, keep it as is
+                    if not parsed.netloc:
+                        new_headers.append((name, value))
+                    else:
+                        # If it's an absolute URL pointing to the origin host, rewrite it
+                        if parsed.netloc.lower() == origin_host.lower():
+                            new_location = urlunparse((
+                                parsed.scheme,
+                                proxy_host,
+                                parsed.path,
+                                parsed.params,
+                                parsed.query,
+                                parsed.fragment
+                            ))
+                            new_headers.append(('Location', new_location))
+                        else:
+                            # Keep other absolute URLs as is
+                            new_headers.append((name, value))
+                except Exception as e:
+                    # If URL parsing fails, keep the original
+                    new_headers.append((name, value))
+                    
+            else:
+                # Keep all other headers as is
                 new_headers.append((name, value))
-            
-            # Add rewritten Set-Cookie headers
-            for cookie in rewritten_cookies:
-                new_headers.append(('Set-Cookie', cookie))
-            
-            self.headers = new_headers
+        
+        self.headers = new_headers
 
     def translate_content(self, origin_host: str, proxy_host: str, chunk_size: int = 8192) -> Iterator[bytes]:
         """Stream and rewrite body chunks, applying URL rewriting per chunk."""

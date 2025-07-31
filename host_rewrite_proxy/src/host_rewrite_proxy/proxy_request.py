@@ -92,7 +92,26 @@ class ProxyRequest:
             lower = key.lower()
             if lower == 'host':
                 new_headers.append(('Host', target_host))
-            elif lower in ('content-length', 'transfer-encoding', 'connection'):
+            elif lower == 'origin':
+                # Rewrite origin to target host
+                new_headers.append(('Origin', f'https://{target_host}'))
+            elif lower == 'referer':
+                # Rewrite referer to target host
+                if value.startswith('https://'):
+                    # Extract path from referer and rewrite to target host
+                    try:
+                        from urllib.parse import urlparse
+                        parsed = urlparse(value)
+                        new_referer = f'https://{target_host}{parsed.path}'
+                        if parsed.query:
+                            new_referer += f'?{parsed.query}'
+                        new_headers.append(('Referer', new_referer))
+                    except:
+                        new_headers.append(('Referer', f'https://{target_host}'))
+                else:
+                    new_headers.append(('Referer', f'https://{target_host}'))
+            elif lower in ('content-length', 'transfer-encoding', 'connection', 'x-forwarded-host', 'x-forwarded-proto'):
+                # Remove these headers as they're proxy-specific
                 continue
             else:
                 new_headers.append((key, value))
