@@ -24,7 +24,6 @@ class HostRewriteServer:
             bug("PROXYING - Method / Path", [request.method, path])
             # Parse incoming request into ProxyRequest (async via Quart)
             proxy_req = await ProxyRequest.from_quart(request)
-            bug("PROXY REQ METHOD", [proxy_req.method])
             proxy_req.translate(self.target_host)
             # Build target URL
             target_url = f"https://{self.target_host}/{path}"
@@ -32,44 +31,22 @@ class HostRewriteServer:
                 target_url += f"?{proxy_req.query_string}"
 
             # Forward request to upstream server
-            bug("SENDING REQUEST", [proxy_req.method, target_url])
-            # For POST requests, we need to handle the body properly
-            if proxy_req.method in ['POST', 'PUT', 'PATCH']:
-                # Read the body content for debugging
-                body_content = proxy_req.body_stream.read() if hasattr(proxy_req.body_stream, 'read') else b''
-                bug("BODY CONTENT LENGTH", [len(body_content)])
-                bug("BODY CONTENT", [body_content.decode('utf-8', errors='ignore') if body_content else ''])
-                # Reset stream position
-                if hasattr(proxy_req.body_stream, 'seek'):
-                    proxy_req.body_stream.seek(0)
-                # Use the body content directly instead of the stream
-                request_data = body_content
-            else:
-                request_data = None
-            
-            # Debug the headers we're sending
-            bug("SENDING HEADERS", [dict(proxy_req.headers)])
             resp = await asyncio.get_event_loop().run_in_executor(
                 None,
                 lambda: requests.request(
                     method=proxy_req.method,
                     url=target_url,
                     headers=dict(proxy_req.headers),
-                    data=request_data,
+                    data=proxy_req.body_stream,
                     stream=True,
                     verify=True,
                     allow_redirects=False
                 )
             )
-            bug("RESPONSE STATUS", [resp.status_code])
-            bug("RESPONSE HEADERS", [dict(resp.headers)])
-            print(f"DEBUG: resp: {resp}")
 
             # Wrap and translate response
             px_resp = ProxyResponse.from_requests(resp)
-            print(f"DEBUG: px_resp: {px_resp}")
             px_resp.translate_headers(self.target_host, self.proxy_host)
-            print(f"DEBUG: px_resp: {px_resp}")
             
             # Remove Content-Encoding and Content-Length headers since we're modifying content
             px_resp.headers = [(name, value) for name, value in px_resp.headers 
@@ -97,11 +74,11 @@ class HostRewriteServer:
                         # Read the entire response content at once
                         try:
                             all_data = await loop.run_in_executor(None, lambda: resp.content)
-                            print(f"DEBUG: Read {len(all_data)} bytes of gzipped content")
+                            # print(f"DEBUG: Read {len(all_data)} bytes of gzipped content")
                             
                             # Decompress and process
                             decompressed = gzip.decompress(all_data)
-                            print(f"DEBUG: Decompressed to {len(decompressed)} bytes")
+                            # print(f"DEBUG: Decompressed to {len(decompressed)} bytes")
                             text = decompressed.decode('utf-8', errors='ignore')
                             text = abs_pattern.sub(f'https://{self.proxy_host}', text)
                             text = rel_pattern.sub(f'//{self.proxy_host}', text)
@@ -117,7 +94,7 @@ class HostRewriteServer:
                             # Fallback: try to read the raw response content
                             try:
                                 all_data = await loop.run_in_executor(None, lambda: resp.raw.read())
-                                print(f"DEBUG: Read {len(all_data)} bytes via raw.read()")
+                                # print(f"DEBUG: Read {len(all_data)} bytes via raw.read()")
                                 
                                 if all_data:
                                     decompressed = gzip.decompress(all_data)
@@ -138,7 +115,7 @@ class HostRewriteServer:
                         try:
                             # Read all content at once to avoid StopIteration issues
                             all_data = await loop.run_in_executor(None, lambda: resp.content)
-                            print(f"DEBUG: Read {len(all_data)} bytes of non-gzipped content")
+                            # print(f"DEBUG: Read {len(all_data)} bytes of non-gzipped content")
                             
                             # Process the content
                             try:

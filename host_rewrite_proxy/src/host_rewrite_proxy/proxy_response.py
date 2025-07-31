@@ -88,6 +88,12 @@ class ProxyResponse:
                 # Keep all other headers as is
                 new_headers.append((name, value))
         
+        # Add CORS headers to allow cross-origin requests
+        new_headers.append(('Access-Control-Allow-Origin', '*'))
+        new_headers.append(('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS'))
+        new_headers.append(('Access-Control-Allow-Headers', 'Content-Type, Authorization'))
+        new_headers.append(('Access-Control-Allow-Credentials', 'true'))
+        
         self.headers = new_headers
 
     def translate_content(self, origin_host: str, proxy_host: str, chunk_size: int = 8192) -> Iterator[bytes]:
