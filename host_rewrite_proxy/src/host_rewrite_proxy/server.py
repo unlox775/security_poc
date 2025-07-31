@@ -7,6 +7,7 @@ from .proxy_request import ProxyRequest
 from .proxy_response import ProxyResponse
 import asyncio
 
+from . import bug
 class HostRewriteServer:
     def __init__(self, target_host: str, proxy_host: str, port: int = 5002):
         self.target_host = target_host
@@ -17,19 +18,18 @@ class HostRewriteServer:
         self._setup_routes()
     
     def _setup_routes(self):
-        @self.app.route('/', defaults={'path': ''})
-        @self.app.route('/<path:path>')
+        @self.app.route('/', defaults={'path': ''}, methods=['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'HEAD', 'OPTIONS'])
+        @self.app.route('/<path:path>', methods=['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'HEAD', 'OPTIONS'])
         async def proxy_request(path):
-            print(f"DEBUG: proxy_request: {path}")  
+            bug("PROXYING - Method / Path", [request.method, path])
             # Parse incoming request into ProxyRequest (async via Quart)
             proxy_req = await ProxyRequest.from_quart(request)
             proxy_req.translate(self.target_host)
             # Build target URL
             target_url = f"https://{self.target_host}/{path}"
-            print(f"DEBUG: target_url: {target_url}")
             if proxy_req.query_string:
                 target_url += f"?{proxy_req.query_string}"
-            print(f"DEBUG: target_url: {target_url}")
+
             # Forward request to upstream server
             resp = await asyncio.get_event_loop().run_in_executor(
                 None,
@@ -85,54 +85,59 @@ class HostRewriteServer:
                             text = decompressed.decode('utf-8', errors='ignore')
                             text = abs_pattern.sub(f'https://{self.proxy_host}', text)
                             text = rel_pattern.sub(f'//{self.proxy_host}', text)
-                            yield text.encode('utf-8')
+                            encoded_text = text.encode('utf-8')
+                            
+                            # Yield in smaller chunks for proper streaming
+                            chunk_size = 8192
+                            for i in range(0, len(encoded_text), chunk_size):
+                                yield encoded_text[i:i + chunk_size]
+                                
                         except Exception as e:
                             print(f"Error processing gzipped content: {e}")
-                            # Fallback: try to read chunks manually
-                            all_data = b''
-                            while True:
-                                try:
-                                    chunk = await loop.run_in_executor(None, lambda: next(px_resp.body_stream))
-                                    all_data += chunk
-                                    print(f"DEBUG: Read chunk of {len(chunk)} bytes, total: {len(all_data)}")
-                                except StopIteration:
-                                    break
-                                except Exception as e:
-                                    print(f"Error reading chunk: {e}")
-                                    break
-                            
-                            if all_data:
-                                try:
+                            # Fallback: try to read the raw response content
+                            try:
+                                all_data = await loop.run_in_executor(None, lambda: resp.raw.read())
+                                print(f"DEBUG: Read {len(all_data)} bytes via raw.read()")
+                                
+                                if all_data:
                                     decompressed = gzip.decompress(all_data)
                                     text = decompressed.decode('utf-8', errors='ignore')
                                     text = abs_pattern.sub(f'https://{self.proxy_host}', text)
                                     text = rel_pattern.sub(f'//{self.proxy_host}', text)
-                                    yield text.encode('utf-8')
-                                except Exception as e:
-                                    print(f"Error decompressing fallback: {e}")
-                                    yield all_data
+                                    encoded_text = text.encode('utf-8')
+                                    
+                                    # Yield in smaller chunks for proper streaming
+                                    chunk_size = 8192
+                                    for i in range(0, len(encoded_text), chunk_size):
+                                        yield encoded_text[i:i + chunk_size]
+                            except Exception as e2:
+                                print(f"Error in fallback: {e2}")
+                                yield b''
                     else:
                         # Stream non-gzipped content
-                        while True:
+                        try:
+                            # Read all content at once to avoid StopIteration issues
+                            all_data = await loop.run_in_executor(None, lambda: resp.content)
+                            print(f"DEBUG: Read {len(all_data)} bytes of non-gzipped content")
+                            
+                            # Process the content
                             try:
-                                chunk = await loop.run_in_executor(None, lambda: next(px_resp.body_stream))
+                                text = all_data.decode('utf-8', errors='ignore')
+                                text = abs_pattern.sub(f'https://{self.proxy_host}', text)
+                                text = rel_pattern.sub(f'//{self.proxy_host}', text)
+                                encoded_text = text.encode('utf-8')
+                            except Exception:
+                                # Non-text or decode error; pass through raw bytes
+                                encoded_text = all_data
+                            
+                            # Yield in smaller chunks for proper streaming
+                            chunk_size = 8192
+                            for i in range(0, len(encoded_text), chunk_size):
+                                yield encoded_text[i:i + chunk_size]
                                 
-                                # Translate the chunk inline
-                                try:
-                                    text = chunk.decode('utf-8', errors='ignore')
-                                    text = abs_pattern.sub(f'https://{self.proxy_host}', text)
-                                    text = rel_pattern.sub(f'//{self.proxy_host}', text)
-                                    translated_chunk = text.encode('utf-8')
-                                except Exception:
-                                    # Non-text or decode error; pass through raw bytes
-                                    translated_chunk = chunk
-                                
-                                yield translated_chunk
-                            except StopIteration:
-                                break
-                            except Exception as e:
-                                print(f"Error reading chunk: {e}")
-                                break
+                        except Exception as e:
+                            print(f"Error processing non-gzipped content: {e}")
+                            yield b''
                 except Exception as e:
                     print(f"Error in stream_content: {e}")
                     yield b''
