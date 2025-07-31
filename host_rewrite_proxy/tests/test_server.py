@@ -150,7 +150,7 @@ class TestHostRewriteServerMultipleCookies(unittest.TestCase):
         cookie_rewriter.rewrite_cookies_and_set_on_response(mock_response.headers, flask_response)
         
         # Check what we got
-        final_headers = flask_response.get_wsgi_headers(None)
+    final_headers = flask_response.get_wsgi_headers(None)
         set_cookie_headers = [value for name, value in final_headers if name.lower() == 'set-cookie']
         
         print(f"Final Set-Cookie headers: {set_cookie_headers}")
@@ -185,7 +185,7 @@ class TestHostRewriteServerMultipleCookies(unittest.TestCase):
         cookie_rewriter.rewrite_cookies_and_set_on_response(headers, flask_response)
         
         # Check what we got
-        final_headers = flask_response.get_wsgi_headers(None)
+    final_headers = flask_response.get_wsgi_headers(None)
         set_cookie_headers = [value for name, value in final_headers if name.lower() == 'set-cookie']
         
         print(f"Final Set-Cookie headers: {set_cookie_headers}")
@@ -193,7 +193,7 @@ class TestHostRewriteServerMultipleCookies(unittest.TestCase):
         # This should show the case sensitivity issue
         print("✅ SUCCESS: Case sensitivity issue identified!")
 
-    @patch('host_rewrite_proxy.reverse_proxy.requests.request')  # mock only upstream HTTP calls
+    @patch('host_rewrite_proxy.server.requests.request')  # mock only upstream HTTP calls
     def test_full_server_flow_with_multiple_cookies(self, mock_request):
         """Test the complete server flow with multiple Set-Cookie headers"""
         print("\n=== Testing Full Server Flow with Multiple Cookies ===")
@@ -326,7 +326,7 @@ class TestHostRewriteServerMultipleCookies(unittest.TestCase):
         }
 
         flask_response = Response('<html>test</html>', status=200)
-        cookie_rewriter = CookieRewriter('example.com', 'proxy.example.com')
+        cookie_rewriter = CookieRewriter('example.com', 'test-ngrok.ngrok-free.app')
         cookie_rewriter.rewrite_cookies_and_set_on_response(headers, flask_response)
 
         final_headers = flask_response.get_wsgi_headers(None)
@@ -336,8 +336,8 @@ class TestHostRewriteServerMultipleCookies(unittest.TestCase):
         self.assertEqual(len(set_cookie_headers), 6, "Should preserve all Set-Cookie headers")
         for cookie in set_cookie_headers:
             if 'Domain=' in cookie:
-                self.assertIn('proxy.example.com', cookie, "Domain should be rewritten to proxy.example.com")
-            self.assertNotIn('example.com; ', cookie.replace('proxy.example.com', ''), "No original domain should remain except rewritten")
+                self.assertIn('test-ngrok.ngrok-free.app', cookie, "Domain should be rewritten to test-ngrok.ngrok-free.app")
+            self.assertNotIn('example.com; ', cookie.replace('test-ngrok.ngrok-free.app', ''), "No original domain should remain except rewritten")
 
     def test_concatenated_set_cookie_header_is_split_and_rewritten(self):
         """
@@ -360,7 +360,7 @@ class TestHostRewriteServerMultipleCookies(unittest.TestCase):
         }
 
         flask_response = Response('<html>test</html>', status=200)
-        cookie_rewriter = CookieRewriter('example.com', 'proxy.example.com')
+        cookie_rewriter = CookieRewriter('example.com', 'test-ngrok.ngrok-free.app')
         cookie_rewriter.rewrite_cookies_and_set_on_response(headers, flask_response)
 
         final_headers = flask_response.get_wsgi_headers(None)
@@ -369,8 +369,8 @@ class TestHostRewriteServerMultipleCookies(unittest.TestCase):
         self.assertEqual(len(set_cookie_headers), 6, "Should split and preserve all cookies from concatenated header")
         for cookie in set_cookie_headers:
             if 'Domain=' in cookie:
-                self.assertIn('proxy.example.com', cookie, "Domain should be rewritten to proxy.example.com")
-            self.assertNotIn('example.com; ', cookie.replace('proxy.example.com', ''), "No original domain should remain except rewritten")
+                self.assertIn('test-ngrok.ngrok-free.app', cookie, "Domain should be rewritten to test-ngrok.ngrok-free.app")
+            self.assertNotIn('example.com; ', cookie.replace('test-ngrok.ngrok-free.app', ''), "No original domain should remain except rewritten")
 
     def test_cookies_with_and_without_domain_are_handled_correctly(self):
         """
@@ -384,13 +384,13 @@ class TestHostRewriteServerMultipleCookies(unittest.TestCase):
                 'cookieA=valA; path=/',
                 'cookieB=valB; path=/; domain=example.com; Secure',
                 'cookieC=valC; path=/; domain=.example.com; HttpOnly',
-                'cookieD=valD; path=/; domain=proxy.example.com; Secure'
+                'cookieD=valD; path=/; domain=test-ngrok.ngrok-free.app; Secure'
             ],
             'Content-Type': 'text/html; charset=utf-8'
         }
 
         flask_response = Response('<html>test</html>', status=200)
-        cookie_rewriter = CookieRewriter('example.com', 'proxy.example.com')
+        cookie_rewriter = CookieRewriter('example.com', 'test-ngrok.ngrok-free.app')
         cookie_rewriter.rewrite_cookies_and_set_on_response(headers, flask_response)
 
         final_headers = flask_response.get_wsgi_headers(None)
@@ -399,7 +399,7 @@ class TestHostRewriteServerMultipleCookies(unittest.TestCase):
         self.assertEqual(len(set_cookie_headers), 4, "Should preserve all cookies")
         for cookie in set_cookie_headers:
             if 'Domain=' in cookie:
-                self.assertIn('proxy.example.com', cookie, "Domain should be rewritten to proxy.example.com")
+                self.assertIn('test-ngrok.ngrok-free.app', cookie, "Domain should be rewritten to test-ngrok.ngrok-free.app")
             else:
                 self.assertNotIn('Domain=', cookie, "Cookies without domain should not have a domain attribute")
 
@@ -419,7 +419,7 @@ class TestHostRewriteServerMultipleCookies(unittest.TestCase):
         }
 
         flask_response = Response('<html>test</html>', status=200)
-        cookie_rewriter = CookieRewriter('example.com', 'proxy.example.com')
+        cookie_rewriter = CookieRewriter('example.com', 'test-ngrok.ngrok-free.app')
         cookie_rewriter.rewrite_cookies_and_set_on_response(headers, flask_response)
 
         final_headers = flask_response.get_wsgi_headers(None)
@@ -445,7 +445,7 @@ class TestHostRewriteServerMultipleCookies(unittest.TestCase):
         }
 
         flask_response = Response('<html>test.html>', status=200)
-        cookie_rewriter = CookieRewriter('example.com', 'proxy.example.com')
+        cookie_rewriter = CookieRewriter('example.com', 'test-ngrok.ngrok-free.app')
         cookie_rewriter.rewrite_cookies_and_set_on_response(headers, flask_response)
 
         final_headers = flask_response.get_wsgi_headers(None)
@@ -476,7 +476,7 @@ class TestHostRewriteServerMultipleCookies(unittest.TestCase):
             print(f"requests.headers: {dict(response.headers)}")
             print(f"requests.raw.headers: {getattr(response.raw, 'headers', None)}")
             flask_response = Response('test', status=200)
-            rewriter = CookieRewriter('example.com', 'proxy.example.com')
+            rewriter = CookieRewriter('example.com', 'test-ngrok.ngrok-free.app')
             rewriter.rewrite_cookies_and_set_on_response(response.headers, flask_response)
             final_headers = flask_response.get_wsgi_headers(None)
             set_cookie_headers = [value for name, value in final_headers if name.lower() == 'set-cookie']

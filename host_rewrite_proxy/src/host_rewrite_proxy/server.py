@@ -2,56 +2,65 @@ import requests
 import json
 import time
 import sys
-from flask import Flask, request, Response
-from .reverse_proxy import ReverseProxy
+from quart import Quart, request, Response
+from .proxy_request import ProxyRequest
+from .proxy_response import ProxyResponse
+import asyncio
 
 class HostRewriteServer:
     def __init__(self, target_host: str, proxy_host: str, port: int = 5002):
         self.target_host = target_host
         self.proxy_host = proxy_host
         self.port = port
-        self.reverse_proxy = ReverseProxy(target_host, proxy_host)
-        self.app = Flask(__name__)
+        # Quart application for async request handling
+        self.app = Quart(__name__)
         self._setup_routes()
     
     def _setup_routes(self):
         @self.app.route('/', defaults={'path': ''})
         @self.app.route('/<path:path>')
-        def proxy_request(path):
-            # Build a streaming proxy request
-            from .proxy_request import ProxyRequest
-            proxy_req = ProxyRequest.from_flask_streaming(request)
-            query_string = request.query_string.decode() if request.query_string else None
-            # Stream request body to the upstream server
-            content, status_code, response_headers, original_headers = \
-                self.reverse_proxy.process_request(
-                    proxy_req.method,
-                    path,
-                    proxy_req.headers,
-                    proxy_req.body_stream,
-                    query_string
+        async def proxy_request(path):
+            print(f"DEBUG: proxy_request: {path}")  
+            # Parse incoming request into ProxyRequest (async via Quart)
+            proxy_req = await ProxyRequest.from_quart(request)
+            proxy_req.translate(self.target_host)
+            # Build target URL
+            target_url = f"https://{self.target_host}/{path}"
+            print(f"DEBUG: target_url: {target_url}")
+            if proxy_req.query_string:
+                target_url += f"?{proxy_req.query_string}"
+            print(f"DEBUG: target_url: {target_url}")
+            # Forward request to upstream server
+            resp = await asyncio.get_event_loop().run_in_executor(
+                None,
+                lambda: requests.request(
+                    method=proxy_req.method,
+                    url=target_url,
+                    headers=dict(proxy_req.headers),
+                    data=proxy_req.body_stream,
+                    stream=True,
+                    verify=True,
+                    allow_redirects=False
                 )
-            
-            # Stream content back to client
-            flask_response = Response(
-                content,
-                status=status_code,
-                headers=response_headers
             )
-            
-            # Process cookies from the original response
-            self.reverse_proxy.process_cookies(original_headers, flask_response)
-            
-            # Remove CORS headers that might interfere
-            flask_response.headers.pop('Access-Control-Allow-Origin', None)
-            flask_response.headers.pop('Access-Control-Allow-Methods', None)
-            flask_response.headers.pop('Access-Control-Allow-Headers', None)
-            
-            return flask_response
+            print(f"DEBUG: resp: {resp}")
+
+            # Wrap and translate response
+            px_resp = ProxyResponse.from_requests(resp)
+            print(f"DEBUG: px_resp: {px_resp}")
+            px_resp.translate_headers(self.target_host, self.proxy_host)
+            print(f"DEBUG: px_resp: {px_resp}")
+            # Stream translated content back to client
+            return Response(
+                px_resp.translate_content(self.target_host, self.proxy_host),
+                status=px_resp.status_code,
+                headers=px_resp.headers
+            )
     
     def run(self):
-        """Start the Flask server"""
-        self.app.run(host='0.0.0.0', port=self.port, debug=False)
+        """Serve the Quart app via built-in async run"""
+        # Quart's run will start the ASGI server
+        self.app.run(host='0.0.0.0', port=self.port, debug=True)
 
 def get_ngrok_url():
     """Get the ngrok public URL from the ngrok API"""
@@ -59,6 +68,7 @@ def get_ngrok_url():
     retries = 10
     wait_seconds = 2
 
+    print("Getting ngrok URL...")
     for _ in range(retries):
         try:
             response = requests.get(ngrok_api)
@@ -68,6 +78,7 @@ def get_ngrok_url():
                     return tunnel['public_url']
         except requests.ConnectionError:
             pass
+        print(f"Retrying ngrok URL retrieval... {_ + 1}/{retries}")
         time.sleep(wait_seconds)
 
     print("Failed to retrieve ngrok URL.")

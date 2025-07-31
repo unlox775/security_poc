@@ -99,32 +99,19 @@ class CookieRewriter:
         return result
     
     def rewrite_cookies(self, cookie_headers: List[str]) -> List[str]:
-        """Rewrite all cookies in a list of cookie headers"""
-        rewritten_cookies = []
-        
+        """Rewrite each Set-Cookie header value directly without splitting."""
+        rewritten = []
         for header in cookie_headers:
-            # Split multiple cookies in one header
-            # Use a more sophisticated approach to handle commas in dates
-            individual_cookies = self._split_cookies(header)
-            
-            for cookie in individual_cookies:
-                cookie_data = self.parse_cookie_string(cookie)
-                if cookie_data:
-                    rewritten_data = self.rewrite_cookie_domain(cookie_data)
-                    rewritten_string = self.cookie_to_string(rewritten_data)
-                    if rewritten_string:
-                        rewritten_cookies.append(rewritten_string)
-                        
-        return rewritten_cookies
+            data = self.parse_cookie_string(header)
+            if not data:
+                continue
+            data = self.rewrite_cookie_domain(data)
+            cookie_str = self.cookie_to_string(data)
+            if cookie_str:
+                rewritten.append(cookie_str)
+        return rewritten
     
-    #     def _split_cookies(self, cookie_header: str) -> List[str]:
-    #         """Split a cookie header into individual cookies, handling commas in dates"""
-    #         # Use regex to split on ", " followed by a cookie name pattern
-    #         import re
-    #         # Split on ", " that is followed by a pattern like "NAME=value"
-    #         pattern = r', (?=[A-Za-z_][A-Za-z0-9_]*=)'
-    #         cookies = re.split(pattern, cookie_header)
-    #         return [cookie.strip() for cookie in cookies if cookie.strip()]
+    # Removed cookie-splitting helpers; each header value is already a single Set-Cookie string
     
     def get_cookie_attrs_for_flask(self, cookie_data: Dict[str, Any]) -> Dict[str, Any]:
         """Convert cookie data to Flask set_cookie parameters"""
@@ -201,63 +188,3 @@ class CookieRewriter:
         if '=' not in cookie_string:
             return
         flask_response.headers.add('Set-Cookie', cookie_string)
-    
-    def _split_cookies(self, cookie_header) -> List[str]:
-        """Split a cookie header into individual cookies, handling commas in dates"""
-        # Handle case where cookie_header is already a list
-        if isinstance(cookie_header, list):
-            return cookie_header
-        
-        # Handle case where cookie_header is a single string (possibly concatenated)
-        if isinstance(cookie_header, str):
-            # Use a proper Set-Cookie parser that handles commas in values
-            return self._parse_set_cookie_header(cookie_header)
-        
-        return []
-    
-    def _parse_set_cookie_header(self, header_string: str) -> List[str]:
-        """Parse a Set-Cookie header string that may contain multiple cookies"""
-        cookies = []
-        current_cookie = ""
-        in_quotes = False
-        i = 0
-        
-        while i < len(header_string):
-            char = header_string[i]
-            
-            if char == '"':
-                in_quotes = not in_quotes
-                current_cookie += char
-            elif char == ',' and not in_quotes:
-                # Check if this comma is followed by a cookie name pattern
-                # Look ahead to see if we have "NAME=value" pattern
-                next_part = header_string[i+1:].strip()
-                if self._looks_like_cookie_start(next_part):
-                    # This is a cookie separator
-                    if current_cookie.strip():
-                        cookies.append(current_cookie.strip())
-                    current_cookie = ""
-                else:
-                    # This comma is part of a value (like in a date)
-                    current_cookie += char
-            else:
-                current_cookie += char
-            
-            i += 1
-        
-        # Add the last cookie
-        if current_cookie.strip():
-            cookies.append(current_cookie.strip())
-        
-        return cookies
-    
-    def _looks_like_cookie_start(self, text: str) -> bool:
-        """Check if text looks like the start of a new cookie (NAME=value pattern)"""
-        # Remove leading whitespace
-        text = text.strip()
-        
-        # Look for pattern like "NAME=value" or "NAME="
-        # Cookie names are typically alphanumeric with some special chars
-        import re
-        pattern = r'^[A-Za-z_][A-Za-z0-9_-]*='
-        return bool(re.match(pattern, text))

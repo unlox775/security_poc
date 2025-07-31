@@ -2,6 +2,7 @@
 
 from typing import List, Tuple, Iterator
 from requests.models import Response as RequestsResponse
+import re
 
 class ProxyResponse:
     """Represents the response from the upstream server in a streamable form."""
@@ -42,7 +43,9 @@ class ProxyResponse:
         cookie_values = [v for (k, v) in self.headers if k.lower() == 'set-cookie']
         # Rewrite cookies
         rewriter = CookieRewriter(origin_host, proxy_host)
+        print(f"DEBUG: cookie_values: {cookie_values}")
         rewritten = rewriter.rewrite_cookies(cookie_values)
+        print(f"DEBUG: rewritten: {rewritten}")
         # Filter out old Set-Cookie entries
         new_headers = [(k, v) for (k, v) in self.headers if k.lower() != 'set-cookie']
         # Append rewritten Set-Cookie headers
@@ -52,15 +55,19 @@ class ProxyResponse:
 
     def translate_content(self, origin_host: str, proxy_host: str, chunk_size: int = 8192) -> Iterator[bytes]:
         """Stream and rewrite body chunks, applying URL rewriting per chunk."""
-        from .reverse_proxy import ReverseProxy
-        proxy = ReverseProxy(origin_host, proxy_host)
+        # Stream and rewrite URLs in each chunk
+        # Rewrite absolute and protocol-relative URLs per chunk
+        abs_pattern = re.compile(rf'https?://{re.escape(origin_host)}', flags=re.IGNORECASE)
+        rel_pattern = re.compile(rf'//{re.escape(origin_host)}', flags=re.IGNORECASE)
         for chunk in self.body_stream:
-            # Rewrite URLs in this chunk if needed
             try:
-                rewritten = proxy.rewrite_urls_in_content(chunk, origin_host, proxy_host)
+                text = chunk.decode('utf-8', errors='ignore')
+                text = abs_pattern.sub(f'https://{proxy_host}', text)
+                text = rel_pattern.sub(f'//{proxy_host}', text)
+                yield text.encode('utf-8')
             except Exception:
-                rewritten = chunk
-            yield rewritten
+                # Non-text or decode error; pass through raw bytes
+                yield chunk
         # After streaming, close any underlying stream if possible
         try:
             if hasattr(self.body_stream, 'close'):
