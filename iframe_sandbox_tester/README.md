@@ -84,6 +84,13 @@ Each iframe contains tests for:
 - ✅ Inline scripts and event handlers work
 - ❌ Cannot access own cookies/localStorage (opaque origin)
 
+## Last Runtime Screenshots
+
+<img width="1000" src="https://github.com/user-attachments/assets/b5029a74-135a-4907-8f76-16eb68143a79" />
+
+<img width="1000" src="https://github.com/user-attachments/assets/177faf87-a9f4-45ae-8ea5-7512174f3917" />
+
+
 ## Key Insights
 
 ### `allow-same-origin` is NOT a Security Vulnerability
