@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Iframe Sandbox Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 10px; background: #f5f5f5; font-size: 12px; }
+        .test-section { margin: 5px 0; padding: 8px; background: white; border-radius: 4px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+        .inline-test { margin: 3px 0; padding: 3px; border-left: 2px solid #ddd; }
+        .success { color: green; font-weight: bold; }
+        .failure { color: red; font-weight: bold; }
+        .testing { color: #1976d2; font-weight: bold; }
+        .warning { color: orange; font-weight: bold; }
+        
+        /* Truncation styles for error messages */
+        .truncatable {
+            cursor: pointer;
+        }
+        .code { background: #f0f0f0; padding: 1px 3px; border-radius: 2px; font-family: monospace; }
+        h1 { color: #333; border-bottom: 2px solid #ddd; padding-bottom: 5px; font-size: 16px; margin: 0 0 10px 0; }
+        h2 { color: #666; margin-top: 10px; font-size: 14px; }
+        h3 { color: #666; margin-top: 10px; font-size: 12px; }
+    </style>
+</head>
+<body>
+    <h1>🔒 Iframe Sandbox Security Test <span id="origin-info" style="font-size: 12px; color: #666; font-weight: normal;">(Iframe: <span id="iframe-origin"></span> | Parent: <span id="parent-origin">JavaScript NA</span> | Same Origin: <span id="same-origin">JavaScript NA</span>)</span></h1>
+
+    <div style="display: flex; gap: 10px;">
+        <div style="flex: 1;">
+            <h2>🔒 JavaScript Tests</h2>
+            
+            <div class="test-section">
+                <h3>Parent Access</h3>
+                <div class="inline-test">
+                    <span class="code">window.parent.document.cookie</span>: <span id="parent-cookie-test" class="failure"><em>JavaScript n/a</em></span>
+                </div>
+                <div class="inline-test">
+                    <span class="code">window.parent.localStorage.getItem('secretKey')</span>: <span id="parent-localstorage-test" class="failure"><em>JavaScript n/a</em></span>
+                </div>
+                <div class="inline-test">
+                    <span class="code">window.parent.location.href</span>: <span id="navigation-test" class="failure"><em>JavaScript n/a</em></span>
+                </div>
+                <div class="inline-test">
+                    <span class="code">window.parent.postMessage()</span>: <span id="postmessage-test" class="failure"><em>JavaScript n/a</em></span>
+                </div>
+            </div>
+
+            <div class="test-section">
+                <h3>Message Received from Parent (window.addEventListener('message', ...)):</h3>
+                <div class="inline-test">
+                    <span id="message-received">Waiting...</span>
+                </div>
+            </div>
+
+        </div>
+
+        <div style="flex: 1;">
+            <h2>🎨 Content Tests</h2>
+            
+            <div class="test-section">
+                <h3>Inline Content</h3>
+                <div class="inline-test">
+                    <span class="code">&lt;style&gt;</span>: <span class="success">✅ Allowed</span>
+                </div>
+                <div class="inline-test">
+                    <span class="code">&lt;script&gt;alert('test')&lt;/script&gt;</span>: <span id="inline-script-test" class="failure"><em>JavaScript n/a</em></span>
+                </div>
+                <div class="inline-test">
+                    <span class="code">onclick="alert('test')"</span>: <span id="event-handler-test" class="failure"><em>JavaScript n/a</em></span>
+                </div>
+            </div>
+
+            <div class="test-section">
+                <h3>Same-Origin Effects (allow-same-origin test)</h3>
+                <div class="inline-test">
+                    <span class="code">document.cookie</span>: <span id="same-origin-cookie-test" class="failure"><em>JavaScript n/a</em></span>
+                </div>
+                <div class="inline-test">
+                    <span class="code">localStorage</span>: <span id="same-origin-storage-test" class="failure"><em>JavaScript n/a</em></span>
+                </div>
+                <div class="inline-test">
+                    <span class="code">window.location.origin</span>: <span id="same-origin-origin-test" class="failure"><em>JavaScript n/a</em></span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/iframe-test.js?v=1"></script>
+</body>
+</html>

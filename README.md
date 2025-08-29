@@ -6,6 +6,13 @@ This repository is dedicated to various security proof of concepts to illustrate
 
 Each folder generally represents a distinct proof of concept or test scenario.
 
+## Projects
+
+### iframe_sandbox_tester/
+A comprehensive testing environment for iframe sandbox security configurations. Tests different sandbox parameters and their effects on cross-origin communication and access. Useful for understanding iframe security policies and demonstrating that `allow-same-origin` is not a security vulnerability.
+
+**Quick start**: `cd iframe_sandbox_tester && make setup && make run`
+
 ## Usage
 
 1. Navigate to the desired test or PoC folder.
