@@ -95,7 +95,7 @@ npm install -g concurrently
 
 ```bash
 # Start the proxy with automatic ngrok setup
-make start TARGET=studio.code.org
+make start TARGET=my-target-site.com
 
 # The proxy will:
 # - Start ngrok automatically on port 5002
@@ -112,8 +112,8 @@ make start TARGET=studio.code.org
 ```bash
 # Proxy any domain
 make start TARGET=example.com
-make start TARGET=bankofamerica.com
-make start TARGET=github.com
+make start TARGET=my-target-site.com
+make start TARGET=amazon.com
 
 # Stop the proxy
 make stop
@@ -128,7 +128,7 @@ If you prefer to run ngrok and the proxy separately:
 ngrok http 5002
 
 # Terminal 2: Start the proxy server
-PYTHONPATH=src python3 server.py studio.code.org
+PYTHONPATH=src python3 server.py my-target-site.com
 
 # Access through the ngrok URL shown in Terminal 1
 ```
