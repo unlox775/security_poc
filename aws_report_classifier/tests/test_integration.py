@@ -26,9 +26,9 @@ class TestClassifierIntegration(unittest.TestCase):
         """Set up test fixtures."""
         self.classifier = EventClassifier()
         
-        # Paths to test data files
-        self.dev_csv = "/Users/dave/Downloads/2025-09_anthony_fraud/dev_suspect_activity.csv"
-        self.prod_csv = "/Users/dave/Downloads/2025-09_anthony_fraud/prod_suspect_activity.csv"
+        # Paths to test data files (set via environment variables for testing)
+        self.dev_csv = os.environ.get('TEST_DEV_CSV', 'test_data/dev_suspect_activity.csv')
+        self.prod_csv = os.environ.get('TEST_PROD_CSV', 'test_data/prod_suspect_activity.csv')
     
     def test_classifier_imports(self):
         """Test that the classifier can be imported and initialized."""

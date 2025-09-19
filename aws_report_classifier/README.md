@@ -13,7 +13,7 @@ A tool for analyzing and classifying AWS CloudTrail events from CSV exports to i
 
 ```bash
 # Analyze your CloudTrail CSV files
-make analyze DEV_CSV=path/to/dev_suspect_activity.csv PROD_CSV=path/to/prod_suspect_activity.csv
+make analyze ENV_DEV_CSV=path/to/dev_events.csv ENV_PROD_CSV=path/to/prod_events.csv
 
 # Audit classifier structure
 make audit
@@ -58,7 +58,7 @@ The tool uses a modular classifier system with service-specific modules:
 
 ```bash
 # Analyze specific files
-make analyze DEV_CSV=./data/dev_events.csv PROD_CSV=./data/prod_events.csv
+make analyze ENV_DEV_CSV=./data/dev_events.csv ENV_PROD_CSV=./data/prod_events.csv
 
 # Just audit the classifier
 make audit
