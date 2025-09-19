@@ -33,6 +33,71 @@ class SessionClusteringAnalyzer:
         self.read_action_pattern = re.compile(r'^(List|Describe|Get|Decrypt)', re.IGNORECASE)
         self.event_classifier = EventClassifier()
         self.anomalies = []
+        self.column_mapping = {}
+    
+    def detect_column_mapping(self, df):
+        """
+        Detect and map CSV columns to expected field names.
+        This makes the tool flexible to handle different CSV formats.
+        
+        Args:
+            df (pd.DataFrame): The CSV data
+            
+        Returns:
+            dict: Mapping of expected fields to actual column names
+        """
+        mapping = {}
+        columns = df.columns.tolist()
+        
+        # Common column name variations and their expected mappings
+        column_variations = {
+            'eventTime': ['eventTime', 'eventtime', 'event_time', 'timestamp', 'time'],
+            'eventSource': ['eventSource', 'eventsource', 'event_source', 'service', 'source'],
+            'eventName': ['eventName', 'eventname', 'event_name', 'action', 'operation'],
+            'userIdentity.type': ['userIdentity.type', 'useridentity.type', 'user_type', 'userType', 'identityType'],
+            'userIdentity.arn': ['userIdentity.arn', 'useridentity.arn', 'user_arn', 'userArn', 'identityArn'],
+            'userIdentity.userName': ['userIdentity.userName', 'useridentity.username', 'user_name', 'userName', 'identityUserName'],
+            'sourceIPAddress': ['sourceIPAddress', 'sourceipaddress', 'source_ip', 'ip', 'clientIp'],
+            'awsRegion': ['awsRegion', 'awsregion', 'region', 'aws_region']
+        }
+        
+        # Find matching columns
+        for expected_field, variations in column_variations.items():
+            for col in columns:
+                if col in variations:
+                    mapping[expected_field] = col
+                    break
+        
+        # Store the mapping for later use
+        self.column_mapping = mapping
+        
+        # Report any missing required columns
+        required_fields = ['eventTime', 'eventSource', 'eventName']
+        missing_fields = [field for field in required_fields if field not in mapping]
+        
+        if missing_fields:
+            self.anomalies.append(f"Missing required columns: {missing_fields}")
+            print(f"⚠️  Warning: Missing required columns: {missing_fields}")
+            print(f"Available columns: {columns}")
+        
+        return mapping
+    
+    def get_column(self, df, expected_field):
+        """
+        Get the actual column name for an expected field using the mapping
+        
+        Args:
+            df (pd.DataFrame): The dataframe
+            expected_field (str): Expected field name
+            
+        Returns:
+            str: Actual column name or None if not found
+        """
+        if expected_field in self.column_mapping:
+            actual_col = self.column_mapping[expected_field]
+            if actual_col in df.columns:
+                return actual_col
+        return None
         
     def load_and_combine_data(self, dev_file, prod_file):
         """
@@ -58,11 +123,20 @@ class SessionClusteringAnalyzer:
         # Combine dataframes
         combined_df = pd.concat([dev_df, prod_df], ignore_index=True)
         
-        # Convert eventTime to datetime
-        combined_df['eventTime'] = pd.to_datetime(combined_df['eventTime'])
+        # Detect column mapping for flexible CSV handling
+        self.detect_column_mapping(combined_df)
         
-        # Sort by eventTime
-        combined_df = combined_df.sort_values('eventTime').reset_index(drop=True)
+        # Get the actual column names for required fields
+        event_time_col = self.get_column(combined_df, 'eventTime')
+        
+        if event_time_col:
+            # Convert eventTime to datetime
+            combined_df[event_time_col] = pd.to_datetime(combined_df[event_time_col])
+            # Sort by eventTime
+            combined_df = combined_df.sort_values(event_time_col).reset_index(drop=True)
+        else:
+            self.anomalies.append("Cannot find eventTime column for sorting")
+            print("⚠️  Warning: Cannot find eventTime column for sorting")
         
         # Check for data quality issues
         self._check_data_quality(combined_df)
@@ -111,9 +185,19 @@ class SessionClusteringAnalyzer:
         combined_df = pd.concat(dataframes, ignore_index=True)
         print(f"Total events loaded: {total_events}")
         
-        # Convert eventTime to datetime and sort
-        combined_df['eventTime'] = pd.to_datetime(combined_df['eventTime'])
-        combined_df = combined_df.sort_values('eventTime').reset_index(drop=True)
+        # Detect column mapping for flexible CSV handling
+        self.detect_column_mapping(combined_df)
+        
+        # Get the actual column names for required fields
+        event_time_col = self.get_column(combined_df, 'eventTime')
+        
+        if event_time_col:
+            # Convert eventTime to datetime and sort
+            combined_df[event_time_col] = pd.to_datetime(combined_df[event_time_col])
+            combined_df = combined_df.sort_values(event_time_col).reset_index(drop=True)
+        else:
+            self.anomalies.append("Cannot find eventTime column for sorting")
+            print("⚠️  Warning: Cannot find eventTime column for sorting")
         
         # Check for data quality issues
         self._check_data_quality(combined_df)
@@ -140,9 +224,19 @@ class SessionClusteringAnalyzer:
         
         print(f"Loaded {len(df)} events")
         
-        # Convert eventTime to datetime and sort
-        df['eventTime'] = pd.to_datetime(df['eventTime'])
-        df = df.sort_values('eventTime').reset_index(drop=True)
+        # Detect column mapping for flexible CSV handling
+        self.detect_column_mapping(df)
+        
+        # Get the actual column names for required fields
+        event_time_col = self.get_column(df, 'eventTime')
+        
+        if event_time_col:
+            # Convert eventTime to datetime and sort
+            df[event_time_col] = pd.to_datetime(df[event_time_col])
+            df = df.sort_values(event_time_col).reset_index(drop=True)
+        else:
+            self.anomalies.append("Cannot find eventTime column for sorting")
+            print("⚠️  Warning: Cannot find eventTime column for sorting")
         
         # Check for data quality issues
         self._check_data_quality(df)
@@ -156,30 +250,40 @@ class SessionClusteringAnalyzer:
         Args:
             df (pd.DataFrame): Combined dataframe
         """
+        # Get actual column names
+        event_time_col = self.get_column(df, 'eventTime')
+        event_source_col = self.get_column(df, 'eventSource')
+        event_name_col = self.get_column(df, 'eventName')
+        
         # Check for missing eventTime
-        missing_times = df['eventTime'].isna().sum()
-        if missing_times > 0:
-            self.anomalies.append(f"Missing eventTime values: {missing_times} events")
+        if event_time_col:
+            missing_times = df[event_time_col].isna().sum()
+            if missing_times > 0:
+                self.anomalies.append(f"Missing eventTime values: {missing_times} events")
         
         # Check for missing eventSource
-        missing_sources = df['eventSource'].isna().sum()
-        if missing_sources > 0:
-            self.anomalies.append(f"Missing eventSource values: {missing_sources} events")
+        if event_source_col:
+            missing_sources = df[event_source_col].isna().sum()
+            if missing_sources > 0:
+                self.anomalies.append(f"Missing eventSource values: {missing_sources} events")
         
         # Check for missing eventName
-        missing_names = df['eventName'].isna().sum()
-        if missing_names > 0:
-            self.anomalies.append(f"Missing eventName values: {missing_names} events")
+        if event_name_col:
+            missing_names = df[event_name_col].isna().sum()
+            if missing_names > 0:
+                self.anomalies.append(f"Missing eventName values: {missing_names} events")
         
         # Check for unusual eventSources (not AWS)
-        non_aws_sources = df[~df['eventSource'].str.contains('amazonaws.com', na=False)]['eventSource'].unique()
-        if len(non_aws_sources) > 0:
-            self.anomalies.append(f"Non-AWS event sources detected: {list(non_aws_sources)}")
+        if event_source_col:
+            non_aws_sources = df[~df[event_source_col].str.contains('amazonaws.com', na=False)][event_source_col].unique()
+            if len(non_aws_sources) > 0:
+                self.anomalies.append(f"Non-AWS event sources detected: {list(non_aws_sources)}")
         
         # Check for unusual date ranges
-        date_range = df['eventTime'].max() - df['eventTime'].min()
-        if date_range.days > 365:
-            self.anomalies.append(f"Unusual date range: {date_range.days} days span")
+        if event_time_col:
+            date_range = df[event_time_col].max() - df[event_time_col].min()
+            if date_range.days > 365:
+                self.anomalies.append(f"Unusual date range: {date_range.days} days span")
         
     
     def identify_sessions(self, df):
@@ -197,13 +301,18 @@ class SessionClusteringAnalyzer:
         sessions = []
         current_session = []
         
+        # Get the actual column name for eventTime
+        event_time_col = self.get_column(df, 'eventTime')
+        if not event_time_col:
+            raise ValueError("Cannot find eventTime column for session identification")
+        
         for i, row in df.iterrows():
             if i == 0:
                 # First event starts first session
                 current_session.append(row)
             else:
                 # Calculate time difference from previous event
-                time_diff = (row['eventTime'] - df.iloc[i-1]['eventTime']).total_seconds()
+                time_diff = (row[event_time_col] - df.iloc[i-1][event_time_col]).total_seconds()
                 
                 if time_diff <= self.gap_seconds:
                     # Within session gap, add to current session
@@ -364,9 +473,20 @@ class SessionClusteringAnalyzer:
         Returns:
             dict: Session analysis results
         """
+        # Get actual column names
+        event_time_col = self.get_column(session_df, 'eventTime')
+        event_source_col = self.get_column(session_df, 'eventSource')
+        event_name_col = self.get_column(session_df, 'eventName')
+        user_type_col = self.get_column(session_df, 'userIdentity.type')
+        user_arn_col = self.get_column(session_df, 'userIdentity.arn')
+        user_name_col = self.get_column(session_df, 'userIdentity.userName')
+        
+        if not all([event_time_col, event_source_col, event_name_col]):
+            raise ValueError("Missing required columns for session analysis")
+        
         # Basic session info
-        start_time = session_df['eventTime'].min()
-        end_time = session_df['eventTime'].max()
+        start_time = session_df[event_time_col].min()
+        end_time = session_df[event_time_col].max()
         duration_hours = (end_time - start_time).total_seconds() / 3600
         
         # Convert to PST for display
@@ -374,18 +494,22 @@ class SessionClusteringAnalyzer:
         start_time_pst = start_time.astimezone(pst)
         
         # Categorize actions using event classifier
-        session_df['action_category'] = session_df.apply(lambda row: self.categorize_action(row['eventSource'], row['eventName']), axis=1)
+        session_df['action_category'] = session_df.apply(lambda row: self.categorize_action(row[event_source_col], row[event_name_col]), axis=1)
         
         # Count events by classification category
         classification_counts = session_df['action_category'].value_counts().to_dict()
         
         # Get unique services
-        services = session_df['eventSource'].apply(self.clean_service_name).unique()
+        services = session_df[event_source_col].apply(self.clean_service_name).unique()
         services_list = ', '.join(sorted(services))
         
         # Get unique users
         session_df['user_type'] = session_df.apply(
-            lambda row: self.extract_user_info(row['userIdentity.type'], row['userIdentity.arn'], row['userIdentity.userName']), 
+            lambda row: self.extract_user_info(
+                row.get(user_type_col) if user_type_col else None,
+                row.get(user_arn_col) if user_arn_col else None,
+                row.get(user_name_col) if user_name_col else None
+            ), 
             axis=1
         )
         users = session_df['user_type'].unique()

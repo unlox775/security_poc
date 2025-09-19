@@ -26,9 +26,9 @@ class TestClassifierIntegration(unittest.TestCase):
         """Set up test fixtures."""
         self.classifier = EventClassifier()
         
-        # Paths to test data files (set via environment variables for testing)
-        self.dev_csv = os.environ.get('TEST_DEV_CSV', 'test_data/dev_suspect_activity.csv')
-        self.prod_csv = os.environ.get('TEST_PROD_CSV', 'test_data/prod_suspect_activity.csv')
+        # Paths to test data files (use fixtures if available, otherwise environment variables)
+        self.dev_csv = os.environ.get('TEST_DEV_CSV', os.path.join(os.path.dirname(__file__), 'test_data', 'standard_format.csv'))
+        self.prod_csv = os.environ.get('TEST_PROD_CSV', os.path.join(os.path.dirname(__file__), 'test_data', 'alternate_format.csv'))
     
     def test_classifier_imports(self):
         """Test that the classifier can be imported and initialized."""
@@ -61,14 +61,20 @@ class TestClassifierIntegration(unittest.TestCase):
         if os.path.exists(self.dev_csv):
             df = pd.read_csv(self.dev_csv)
             self.assertGreater(len(df), 0, "Dev CSV file is empty")
-            self.assertIn('eventSource', df.columns, "Dev CSV missing eventSource column")
-            self.assertIn('eventName', df.columns, "Dev CSV missing eventName column")
+            # Test flexible column detection - should have either standard or alternate column names
+            has_event_source = any(col in df.columns for col in ['eventSource', 'service', 'source'])
+            has_event_name = any(col in df.columns for col in ['eventName', 'operation', 'action'])
+            self.assertTrue(has_event_source, "Dev CSV missing event source column (eventSource/service/source)")
+            self.assertTrue(has_event_name, "Dev CSV missing event name column (eventName/operation/action)")
         
         if os.path.exists(self.prod_csv):
             df = pd.read_csv(self.prod_csv)
             self.assertGreater(len(df), 0, "Prod CSV file is empty")
-            self.assertIn('eventSource', df.columns, "Prod CSV missing eventSource column")
-            self.assertIn('eventName', df.columns, "Prod CSV missing eventName column")
+            # Test flexible column detection - should have either standard or alternate column names
+            has_event_source = any(col in df.columns for col in ['eventSource', 'service', 'source'])
+            has_event_name = any(col in df.columns for col in ['eventName', 'operation', 'action'])
+            self.assertTrue(has_event_source, "Prod CSV missing event source column (eventSource/service/source)")
+            self.assertTrue(has_event_name, "Prod CSV missing event name column (eventName/operation/action)")
     
     def test_classification_summary(self):
         """Test that classification summary works."""

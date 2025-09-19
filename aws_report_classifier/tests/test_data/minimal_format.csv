@@ -1,0 +1,6 @@
+time,source,action
+2025-05-07T20:38:57Z,ec2.amazonaws.com,DescribeRegions
+2025-05-07T20:39:04Z,ec2.amazonaws.com,DescribeRegions
+2025-05-07T20:38:57Z,servicecatalog-appregistry.amazonaws.com,ListApplications
+2025-05-07T20:39:05Z,notifications.amazonaws.com,ListNotificationHubs
+2025-05-07T20:39:06Z,iam.amazonaws.com,GetUser

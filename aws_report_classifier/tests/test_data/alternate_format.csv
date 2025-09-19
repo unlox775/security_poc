@@ -1,0 +1,6 @@
+timestamp,service,operation,user_type,user_arn,user_name,ip,region,request_params,response_elements,error_code,account_id
+2025-05-07T20:38:57Z,ec2.amazonaws.com,DescribeRegions,Root,arn:aws:iam::165336972514:root,admin,98.225.53.234,us-west-2,"{""regionSet"": {}, ""allRegions"": true}",null,,165336972514
+2025-05-07T20:39:04Z,ec2.amazonaws.com,DescribeRegions,Root,arn:aws:iam::165336972514:root,admin,98.225.53.234,us-west-2,"{""regionSet"": {}, ""allRegions"": true}",null,,165336972514
+2025-05-07T20:38:57Z,servicecatalog-appregistry.amazonaws.com,ListApplications,Root,arn:aws:iam::165336972514:root,admin,98.225.53.234,us-west-2,"{""maxResults"": ""100""}",null,,165336972514
+2025-05-07T20:39:05Z,notifications.amazonaws.com,ListNotificationHubs,Root,arn:aws:iam::165336972514:root,admin,98.225.53.234,us-west-2,null,null,,165336972514
+2025-05-07T20:39:06Z,iam.amazonaws.com,GetUser,AssumedRole,arn:aws:sts::165336972514:assumed-role/Engineering_FullAccess/user.name@company.com,user.name@company.com,98.225.53.234,us-west-2,"{""userName"": ""user.name@company.com""}",null,,165336972514

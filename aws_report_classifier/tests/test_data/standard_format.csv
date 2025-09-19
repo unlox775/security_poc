@@ -1,0 +1,6 @@
+eventTime,userIdentity.type,userIdentity.arn,userIdentity.userName,eventSource,eventName,sourceIPAddress,awsRegion,requestParameters,responseElements,errorCode,recipientAccountId,sessionContext.sessionIssuer.arn,additionalEventData.MFAUsed,resourceTypes,resourceARNs
+2025-05-07T20:38:57Z,Root,arn:aws:iam::165336972514:root,codeorg-dev,ec2.amazonaws.com,DescribeRegions,98.225.53.234,us-west-2,"{""regionSet"": {}, ""allRegions"": true}",null,,165336972514,,,,
+2025-05-07T20:39:04Z,Root,arn:aws:iam::165336972514:root,codeorg-dev,ec2.amazonaws.com,DescribeRegions,98.225.53.234,us-west-2,"{""regionSet"": {}, ""allRegions"": true}",null,,165336972514,,,,
+2025-05-07T20:38:57Z,Root,arn:aws:iam::165336972514:root,codeorg-dev,servicecatalog-appregistry.amazonaws.com,ListApplications,98.225.53.234,us-west-2,"{""maxResults"": ""100""}",null,,165336972514,,,,
+2025-05-07T20:39:05Z,Root,arn:aws:iam::165336972514:root,codeorg-dev,notifications.amazonaws.com,ListNotificationHubs,98.225.53.234,us-west-2,null,null,,165336972514,,,,
+2025-05-07T20:39:06Z,AssumedRole,arn:aws:sts::165336972514:assumed-role/Engineering_FullAccess/user.name@company.com,,iam.amazonaws.com,GetUser,98.225.53.234,us-west-2,"{""userName"": ""user.name@company.com""}",null,,165336972514,arn:aws:iam::165336972514:role/Engineering_FullAccess,,,

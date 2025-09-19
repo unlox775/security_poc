@@ -9,6 +9,24 @@ A tool for analyzing and classifying AWS CloudTrail events from CSV exports to i
 - **Audit System**: Validates classifier structure and consistency
 - **Modular Design**: Service-specific classifiers for different AWS services
 
+## CSV Format Support
+
+The tool automatically detects and maps CSV columns to expected fields, making it flexible to handle different CSV formats. The tool looks for these column variations:
+
+**Required Columns:**
+- **Event Time**: `eventTime`, `eventtime`, `event_time`, `timestamp`, `time`
+- **Event Source**: `eventSource`, `eventsource`, `event_source`, `service`, `source`  
+- **Event Name**: `eventName`, `eventname`, `event_name`, `action`, `operation`
+
+**Optional Columns (for enhanced analysis):**
+- **User Identity Type**: `userIdentity.type`, `useridentity.type`, `user_type`, `userType`, `identityType`
+- **User ARN**: `userIdentity.arn`, `useridentity.arn`, `user_arn`, `userArn`, `identityArn`
+- **User Name**: `userIdentity.userName`, `useridentity.username`, `user_name`, `userName`, `identityUserName`
+- **Source IP**: `sourceIPAddress`, `sourceipaddress`, `source_ip`, `ip`, `clientIp`
+- **AWS Region**: `awsRegion`, `awsregion`, `region`, `aws_region`
+
+The tool will automatically detect the available columns and provide warnings if required fields are missing.
+
 ## Quick Start
 
 ```bash

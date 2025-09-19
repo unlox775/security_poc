@@ -78,6 +78,12 @@ test-integration:
 	@PYTHONPATH=src python3 tests/test_integration.py
 	@echo "✅ Integration tests passed!"
 
+# Run session clustering tests
+test-sessions:
+	@echo "🧪 Running session clustering tests..."
+	@PYTHONPATH=src python3 -m unittest tests.test_session_clustering -v
+	@echo "✅ Session clustering tests passed!"
+
 # Clean up temporary files
 clean:
 	@echo "🧹 Cleaning up..."
@@ -112,6 +118,9 @@ help:
 	@echo ""
 	@echo "  make test-integration"
 	@echo "    Run integration tests only"
+	@echo ""
+	@echo "  make test-sessions"
+	@echo "    Run session clustering tests only"
 	@echo ""
 	@echo "  make clean"
 	@echo "    Clean up temporary files"
