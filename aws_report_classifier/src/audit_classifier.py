@@ -143,7 +143,6 @@ class ClassifierAuditor:
             all_events.update(service_classifier.sensitive_write)
             all_events.update(service_classifier.hacking_reads)
             all_events.update(service_classifier.strange_reads)
-            all_events.update(service_classifier.infra_reads)
             
             # Check for duplicates
             event_counts = {}
@@ -199,8 +198,7 @@ class ClassifierAuditor:
                            len(service_classifier.sensitive_read_only) + 
                            len(service_classifier.sensitive_write) + 
                            len(service_classifier.hacking_reads) + 
-                           len(service_classifier.strange_reads) + 
-                           len(service_classifier.infra_reads))
+                           len(service_classifier.strange_reads))
             
             if total_events == 0:
                 empty_classifiers.append(classifier_name)
@@ -243,7 +241,6 @@ class ClassifierAuditor:
             all_events.update(service_classifier.sensitive_write)
             all_events.update(service_classifier.hacking_reads)
             all_events.update(service_classifier.strange_reads)
-            all_events.update(service_classifier.infra_reads)
             
             # Check each event's source against handled_sources
             for event_source, event_name in all_events:
@@ -288,14 +285,76 @@ class ClassifierAuditor:
             'count': len(inconsistent_sources)
         }
     
-    def audit_summary_statistics(self):
+    def audit_cross_category_duplicates(self):
         """
-        Audit 6: Classification summary statistics.
+        Audit 6: Check for events classified in multiple categories within each classifier.
         
         Returns:
             dict: Results of the audit
         """
-        print("\n🔍 AUDIT 6: Classification Summary Statistics")
+        print("\n🔍 AUDIT 6: Cross-Category Duplicate Events Check")
+        print("-" * 50)
+        
+        cross_duplicates = []
+        
+        # Get all classifier instances
+        from event_classifier import EventClassifier
+        main_classifier = EventClassifier()
+        
+        for classifier in main_classifier.classifiers:
+            classifier_name = classifier.__class__.__name__
+            # Collect all events from all categories
+            all_events = set()
+            category_events = {}
+            
+            # Get events from each category
+            for category in ['safe_read_only', 'sensitive_read_only', 'sensitive_write', 
+                           'hacking_reads', 'strange_reads']:
+                if hasattr(classifier, category):
+                    events = getattr(classifier, category)
+                    category_events[category] = events.copy()
+                    all_events.update(events)
+            
+            # Check for duplicates across categories
+            for event in all_events:
+                found_in = []
+                for category, events in category_events.items():
+                    if event in events:
+                        found_in.append(category)
+                
+                if len(found_in) > 1:
+                    event_str = f"{event[0].replace('.amazonaws.com', '')}: {event[1]}"
+                    cross_duplicates.append({
+                        'classifier': classifier_name,
+                        'event': event_str,
+                        'categories': found_in
+                    })
+        
+        if cross_duplicates:
+            print(f"❌ FOUND {len(cross_duplicates)} CROSS-CATEGORY DUPLICATES:")
+            for dup in cross_duplicates:
+                print(f"  - {dup['classifier']}: {dup['event']}")
+                print(f"    ⚠️  Found in: {', '.join(dup['categories'])}")
+                print(f"    ⚠️  Remove from all but one category!")
+            
+            self.issues_found.append(f"{len(cross_duplicates)} cross-category duplicates")
+        else:
+            print("✅ No cross-category duplicates found!")
+        
+        return {
+            'passed': len(cross_duplicates) == 0,
+            'duplicates': cross_duplicates,
+            'count': len(cross_duplicates)
+        }
+    
+    def audit_summary_statistics(self):
+        """
+        Audit 7: Classification summary statistics.
+        
+        Returns:
+            dict: Results of the audit
+        """
+        print("\n🔍 AUDIT 7: Classification Summary Statistics")
         print("-" * 50)
         
         total_dashboard_events = len(self.classifier.dashboard_reads)
@@ -308,8 +367,7 @@ class ClassifierAuditor:
                                len(service_classifier.sensitive_read_only) + 
                                len(service_classifier.sensitive_write) + 
                                len(service_classifier.hacking_reads) + 
-                               len(service_classifier.strange_reads) + 
-                               len(service_classifier.infra_reads))
+                               len(service_classifier.strange_reads))
             total_service_events += classifier_events
             all_service_sources.update(service_classifier.handled_sources)
             
@@ -345,6 +403,7 @@ class ClassifierAuditor:
         results['duplicate_events'] = self.audit_duplicate_events()
         results['empty_classifiers'] = self.audit_empty_classifiers()
         results['source_consistency'] = self.audit_source_consistency()
+        results['cross_category_duplicates'] = self.audit_cross_category_duplicates()
         results['summary'] = self.audit_summary_statistics()
         
         # Summary
@@ -355,12 +414,14 @@ class ClassifierAuditor:
         print(f"  Duplicate Events:       {'❌ FOUND' if not results['duplicate_events']['passed'] else '✅ NONE'}")
         print(f"  Empty Classifiers:      {'⚠️  FOUND' if not results['empty_classifiers']['passed'] else '✅ NONE'}")
         print(f"  Source Consistency:     {'❌ FOUND' if not results['source_consistency']['passed'] else '✅ NONE'}")
+        print(f"  Cross-Category Duplicates: {'❌ FOUND' if not results['cross_category_duplicates']['passed'] else '✅ NONE'}")
         
         all_passed = all([
             results['dashboard_overlaps']['passed'],
             results['source_conflicts']['passed'],
             results['duplicate_events']['passed'],
-            results['source_consistency']['passed']
+            results['source_consistency']['passed'],
+            results['cross_category_duplicates']['passed']
         ])
         
         if all_passed and len(self.warnings_found) == 0:

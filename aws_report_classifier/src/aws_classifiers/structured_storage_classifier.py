@@ -17,7 +17,29 @@ class StructuredStorageEventClassifier(BaseEventClassifier):
     """
     
     def _initialize_rules(self):
-        """Initialize classification rules for structured storage services."""
+        """Initialize classification rules for structured storage services.
+        
+        Classification Guidelines:
+        
+        SAFE_READ_ONLY: Operations that expose fundamentally public or harmless information.
+        - No external references that could be exploited
+        - Information that would be safe if publicly accessible
+        - Examples: availability zones, regions, basic account attributes
+        
+        SENSITIVE_READ_ONLY: Operations that expose information useful for exploitation.
+        - Reading reveals exploitable details (IP addresses, security rules, etc.)
+        - Information that enables direct connection or attack vectors
+        - Examples: security groups with IP addresses, instance details with public IPs
+        
+        HACKING_READS: Classic reconnaissance operations for gaining exploitation intel.
+        - Standard penetration testing activities
+        - Gathering information to enable later exploitation
+        - Examples: enumerating security groups, finding public instances, backup configs
+        
+        SENSITIVE_WRITE: Operations that modify or create resources.
+        - Any operation that changes system state
+        - Examples: creating instances, modifying configurations
+        """
         self.handled_sources = {
             "rds.amazonaws.com",             # Relational Database Service for managed databases
             "dynamodb.amazonaws.com"         # DynamoDB for NoSQL document and key-value storage
@@ -34,8 +56,6 @@ class StructuredStorageEventClassifier(BaseEventClassifier):
         # SENSITIVE_READ_ONLY: Database operations that could expose sensitive information
         self.sensitive_read_only.update({
             # RDS - Database information
-            ("rds.amazonaws.com", "DescribeDBInstances"),
-            ("rds.amazonaws.com", "DescribeDBClusters"),
             ("rds.amazonaws.com", "DescribeDBSnapshots"),
             ("rds.amazonaws.com", "DescribeDBClusterSnapshots"),
             ("rds.amazonaws.com", "DescribeDBParameterGroups"),
@@ -49,15 +69,11 @@ class StructuredStorageEventClassifier(BaseEventClassifier):
             ("rds.amazonaws.com", "DescribeReservedDBInstancesOfferings"),
             ("rds.amazonaws.com", "DescribeEventCategories"),
             ("rds.amazonaws.com", "DescribeEvents"),
-            ("rds.amazonaws.com", "DescribeDBLogFiles"),
-            ("rds.amazonaws.com", "DownloadDBLogFilePortion"),
             ("rds.amazonaws.com", "DescribeDBProxyTargets"),
             ("rds.amazonaws.com", "DescribeDBProxies"),
             ("rds.amazonaws.com", "DescribeGlobalClusters"),
             
             # DynamoDB - NoSQL database information
-            ("dynamodb.amazonaws.com", "DescribeTable"),
-            ("dynamodb.amazonaws.com", "ListTables"),
             ("dynamodb.amazonaws.com", "DescribeTimeToLive"),
             ("dynamodb.amazonaws.com", "ListTagsOfResource"),
             ("dynamodb.amazonaws.com", "DescribeContinuousBackups"),
@@ -148,9 +164,3 @@ class StructuredStorageEventClassifier(BaseEventClassifier):
             ("rds.amazonaws.com", "DownloadDBLogFilePortion"),
         })
         
-        # INFRA_READS: Infrastructure database management
-        self.infra_reads.update({
-            # RDS - Infrastructure database management
-            ("rds.amazonaws.com", "DescribeDBInstances"),
-            ("rds.amazonaws.com", "DescribeDBClusters"),
-        })

@@ -21,7 +21,29 @@ class IdentityEventClassifier(BaseEventClassifier):
     """
     
     def _initialize_rules(self):
-        """Initialize classification rules for identity services."""
+        """Initialize classification rules for identity services.
+        
+        Classification Guidelines:
+        
+        SAFE_READ_ONLY: Operations that expose fundamentally public or harmless information.
+        - No external references that could be exploited
+        - Information that would be safe if publicly accessible
+        - Examples: availability zones, regions, basic account attributes
+        
+        SENSITIVE_READ_ONLY: Operations that expose information useful for exploitation.
+        - Reading reveals exploitable details (IP addresses, security rules, etc.)
+        - Information that enables direct connection or attack vectors
+        - Examples: security groups with IP addresses, instance details with public IPs
+        
+        HACKING_READS: Classic reconnaissance operations for gaining exploitation intel.
+        - Standard penetration testing activities
+        - Gathering information to enable later exploitation
+        - Examples: enumerating security groups, finding public instances, backup configs
+        
+        SENSITIVE_WRITE: Operations that modify or create resources.
+        - Any operation that changes system state
+        - Examples: creating instances, modifying configurations
+        """
         self.handled_sources = {
             "iam.amazonaws.com",              # Identity and access management for users/roles/policies
             "sts.amazonaws.com",              # Security token service for temporary credentials
@@ -69,6 +91,37 @@ class IdentityEventClassifier(BaseEventClassifier):
             ("iam.amazonaws.com", "GetAccessKeyLastUsed"),
             ("iam.amazonaws.com", "ListMFADevices"),
             ("iam.amazonaws.com", "GetMFADevice"),
+            ("iam.amazonaws.com", "GetAccountEmailAddress"),
+            ("iam.amazonaws.com", "GetAccountName"),
+            ("iam.amazonaws.com", "GetInstanceProfile"),
+            ("iam.amazonaws.com", "GetLoginProfile"),
+            ("iam.amazonaws.com", "ListAttachedUserPolicies"),
+            ("iam.amazonaws.com", "ListCloudFrontPublicKeys"),
+            ("iam.amazonaws.com", "ListGroupsForUser"),
+            ("iam.amazonaws.com", "ListSSHPublicKeys"),
+            ("iam.amazonaws.com", "ListServerCertificates"),
+            ("iam.amazonaws.com", "ListServiceSpecificCredentials"),
+            ("iam.amazonaws.com", "ListSigningCertificates"),
+            ("iam.amazonaws.com", "ListUserPolicies"),
+            ("iam.amazonaws.com", "ListUserTags"),
+            
+            # SSO - Single sign-on information
+            ("sso.amazonaws.com", "DescribeRegisteredRegions"),
+            ("sso.amazonaws.com", "GetSSOStatus"),
+            ("sso.amazonaws.com", "ListDirectoryAssociations"),
+            ("sso.amazonaws.com", "ListInstances"),
+            
+            # Organizations - Account and policy information
+            ("organizations.amazonaws.com", "AcceptHandshake"),
+            ("organizations.amazonaws.com", "DescribeAccount"),
+            ("organizations.amazonaws.com", "DescribeResourcePolicy"),
+            ("organizations.amazonaws.com", "ListAWSServiceAccessForOrganization"),
+            ("organizations.amazonaws.com", "ListDelegatedAdministrators"),
+            ("organizations.amazonaws.com", "ListHandshakesForAccount"),
+            ("organizations.amazonaws.com", "ListHandshakesForOrganization"),
+            ("organizations.amazonaws.com", "ListParents"),
+            ("organizations.amazonaws.com", "ListTagsForResource"),
+            ("organizations.amazonaws.com", "ListAccounts"),
             
             # STS - Token and identity information
             ("sts.amazonaws.com", "GetCallerIdentity"),
@@ -229,13 +282,3 @@ class IdentityEventClassifier(BaseEventClassifier):
             ("kms.amazonaws.com", "ImportKeyMaterial"),
         })
         
-        # INFRA_READS: Infrastructure identity management
-        self.infra_reads.update({
-            # Organizations - Infrastructure organization management (dashboard reads removed)
-            ("organizations.amazonaws.com", "ListRoots"),
-            
-            # IAM - Infrastructure role management
-            ("iam.amazonaws.com", "ListRoles"),
-            ("iam.amazonaws.com", "ListAttachedRolePolicies"),
-            ("iam.amazonaws.com", "ListRolePolicies"),
-        })

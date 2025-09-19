@@ -25,7 +25,6 @@ class BaseEventClassifier(ABC):
         self.sensitive_write = set()     # Operations that modify resources
         self.hacking_reads = set()       # Pen testing/discovery activities
         self.strange_reads = set()       # Odd/unusual read operations
-        self.infra_reads = set()         # Infrastructure management reads
         
         # Service-specific event sources this classifier handles
         self.handled_sources = set()
@@ -63,7 +62,7 @@ class BaseEventClassifier(ABC):
         # Check that event sources match handled_sources
         all_events = (self.safe_read_only | self.sensitive_read_only | 
                      self.sensitive_write | self.hacking_reads | 
-                     self.strange_reads | self.infra_reads)
+                     self.strange_reads)
         
         for event_source, _ in all_events:
             if event_source not in self.handled_sources:
@@ -73,7 +72,7 @@ class BaseEventClassifier(ABC):
         """Get all events defined by this classifier."""
         return (self.safe_read_only | self.sensitive_read_only | 
                 self.sensitive_write | self.hacking_reads | 
-                self.strange_reads | self.infra_reads)
+                self.strange_reads)
     
     def get_classification_summary(self) -> Dict[str, int]:
         """Get a summary of event counts by classification."""
@@ -82,8 +81,7 @@ class BaseEventClassifier(ABC):
             "SENSITIVE_READ_ONLY": len(self.sensitive_read_only),
             "SENSITIVE_WRITE": len(self.sensitive_write),
             "HACKING_READS": len(self.hacking_reads),
-            "STRANGE_READS": len(self.strange_reads),
-            "INFRA_READS": len(self.infra_reads)
+            "STRANGE_READS": len(self.strange_reads)
         }
     
     def classify_event(self, event_source: str, event_name: str) -> str:
@@ -107,8 +105,6 @@ class BaseEventClassifier(ABC):
             return "HACKING_READS"
         elif event_key in self.strange_reads:
             return "STRANGE_READS"
-        elif event_key in self.infra_reads:
-            return "INFRA_READS"
         else:
             return "UNCLASSIFIED"
     

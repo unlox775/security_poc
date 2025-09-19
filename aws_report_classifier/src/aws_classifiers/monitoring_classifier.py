@@ -21,14 +21,38 @@ class MonitoringEventClassifier(BaseEventClassifier):
     """
     
     def _initialize_rules(self):
-        """Initialize classification rules for monitoring services."""
+        """Initialize classification rules for monitoring services.
+        
+        Classification Guidelines:
+        
+        SAFE_READ_ONLY: Operations that expose fundamentally public or harmless information.
+        - No external references that could be exploited
+        - Information that would be safe if publicly accessible
+        - Examples: availability zones, regions, basic account attributes
+        
+        SENSITIVE_READ_ONLY: Operations that expose information useful for exploitation.
+        - Reading reveals exploitable details (IP addresses, security rules, etc.)
+        - Information that enables direct connection or attack vectors
+        - Examples: security groups with IP addresses, instance details with public IPs
+        
+        HACKING_READS: Classic reconnaissance operations for gaining exploitation intel.
+        - Standard penetration testing activities
+        - Gathering information to enable later exploitation
+        - Examples: enumerating security groups, finding public instances, backup configs
+        
+        SENSITIVE_WRITE: Operations that modify or create resources.
+        - Any operation that changes system state
+        - Examples: creating instances, modifying configurations
+        """
         self.handled_sources = {
             "monitoring.amazonaws.com",        # CloudWatch monitoring for metrics and alarms
             "health.amazonaws.com",            # AWS Health for service status and events
             "logs.amazonaws.com",              # CloudWatch Logs for log collection and analysis
             "application-insights.amazonaws.com", # Application Insights for app performance monitoring
             "application-signals.amazonaws.com", # Application Signals for observability data
-            "oam.amazonaws.com"               # Observability Access Manager for cross-account monitoring
+            "oam.amazonaws.com",               # Observability Access Manager for cross-account monitoring
+            "trustedadvisor.amazonaws.com",    # Trusted Advisor for AWS best practices recommendations
+            "aiops.amazonaws.com"              # AIOps for AI-powered operations insights
         }
         
         # SAFE_READ_ONLY: Basic monitoring operations that don't expose sensitive data
@@ -50,6 +74,11 @@ class MonitoringEventClassifier(BaseEventClassifier):
             ("logs.amazonaws.com", "GetQueryResults"),
             ("logs.amazonaws.com", "GetLogGroupFields"),
             ("logs.amazonaws.com", "GetLogRecord"),
+            ("logs.amazonaws.com", "DescribeAccountPolicies"),
+            ("logs.amazonaws.com", "DescribeIndexPolicies"),
+            ("logs.amazonaws.com", "GetTransformer"),
+            ("logs.amazonaws.com", "ListLogAnomalyDetectors"),
+            ("logs.amazonaws.com", "ListLogGroupsForEntity"),
             
             # Monitoring - CloudWatch metrics and alarms
             ("monitoring.amazonaws.com", "DescribeAnomalyDetectors"),
@@ -82,6 +111,14 @@ class MonitoringEventClassifier(BaseEventClassifier):
             ("oam.amazonaws.com", "GetSink"),
             ("oam.amazonaws.com", "ListAttachedLinks"),
             ("oam.amazonaws.com", "GetLink"),
+            
+            # Trusted Advisor - Recommendations and checks
+            ("trustedadvisor.amazonaws.com", "DescribeAccount"),
+            ("trustedadvisor.amazonaws.com", "DescribeCheckSummaries"),
+            ("trustedadvisor.amazonaws.com", "DescribeChecks"),
+            
+            # AIOps - AI operations insights
+            ("aiops.amazonaws.com", "ListInvestigationGroups"),
         })
         
         # SENSITIVE_WRITE: Monitoring operations that modify configurations
@@ -122,13 +159,3 @@ class MonitoringEventClassifier(BaseEventClassifier):
             # Health - Detailed health information that might be unusual
         })
         
-        # INFRA_READS: Infrastructure monitoring management
-        self.infra_reads.update({
-            # Monitoring - Infrastructure monitoring setup
-            ("monitoring.amazonaws.com", "DescribeAlarmHistory"),
-            ("monitoring.amazonaws.com", "ListMetricStreams"),
-            ("monitoring.amazonaws.com", "DescribeMetricStreams"),
-            
-            # OAM - Infrastructure observability management
-            ("oam.amazonaws.com", "ListLinks"),
-        })

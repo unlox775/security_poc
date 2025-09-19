@@ -632,11 +632,19 @@ class SessionClusteringAnalyzer:
         # Generate report header
         report_header = self.generate_session_report(session_summary)
         
-        # Prepare session data for CSV (move source_file to beginning)
+        # Prepare session data for CSV (move source_file to beginning, add classification as second column)
         session_data = session_summary['session_data'].copy()
         cols = list(session_data.columns)
+        
+        # Remove source_file and action_category from their current positions
         cols.remove('source_file')
-        cols.insert(0, 'source_file')
+        if 'action_category' in cols:
+            cols.remove('action_category')
+        
+        # Insert source_file first, then action_category second
+        cols.insert(0, 'action_category')  # Insert classification as second column
+        cols.insert(0, 'source_file')      # Insert source_file as first column
+        
         session_data = session_data[cols]
         
         # Write file with header

@@ -23,7 +23,29 @@ class NetworkingEventClassifier(BaseEventClassifier):
     """
     
     def _initialize_rules(self):
-        """Initialize classification rules for networking services."""
+        """Initialize classification rules for networking services.
+        
+        Classification Guidelines:
+        
+        SAFE_READ_ONLY: Operations that expose fundamentally public or harmless information.
+        - No external references that could be exploited
+        - Information that would be safe if publicly accessible
+        - Examples: availability zones, regions, basic account attributes
+        
+        SENSITIVE_READ_ONLY: Operations that expose information useful for exploitation.
+        - Reading reveals exploitable details (IP addresses, security rules, etc.)
+        - Information that enables direct connection or attack vectors
+        - Examples: security groups with IP addresses, instance details with public IPs
+        
+        HACKING_READS: Classic reconnaissance operations for gaining exploitation intel.
+        - Standard penetration testing activities
+        - Gathering information to enable later exploitation
+        - Examples: enumerating security groups, finding public instances, backup configs
+        
+        SENSITIVE_WRITE: Operations that modify or create resources.
+        - Any operation that changes system state
+        - Examples: creating instances, modifying configurations
+        """
         self.handled_sources = {
             "route53.amazonaws.com",            # Route 53 for DNS hosting and domain management
             "route53domains.amazonaws.com",     # Route 53 Domains for domain registration
@@ -38,55 +60,51 @@ class NetworkingEventClassifier(BaseEventClassifier):
         # SAFE_READ_ONLY: Basic networking information that doesn't expose sensitive data
         self.safe_read_only.update({
             # Route53 - Basic DNS information
-            ("route53.amazonaws.com", "GetChange"),
-            ("route53.amazonaws.com", "GetHealthCheckCount"),
-            ("route53.amazonaws.com", "GetHostedZoneCount"),
-            ("route53.amazonaws.com", "GetTrafficPolicyInstanceCount"),
-            ("route53domains.amazonaws.com", "ListDomains"),
-            ("route53domains.amazonaws.com", "ListOperations"),
+            ("route53.amazonaws.com", "GetChange"),                          # DNS change status - public change tracking
+            ("route53.amazonaws.com", "GetHealthCheckCount"),               # Health check count - public monitoring stats
+            ("route53.amazonaws.com", "GetHostedZoneCount"),                # Hosted zone count - public zone statistics
+            ("route53.amazonaws.com", "GetTrafficPolicyInstanceCount"),     # Traffic policy count - public policy stats
+            ("route53domains.amazonaws.com", "ListDomains"),                # Domain inventory - public domain list
+            ("route53domains.amazonaws.com", "ListOperations"),             # Domain operations - public operation history
             
             # Service Discovery - Basic service registry
-            ("servicediscovery.amazonaws.com", "ListNamespaces"),
         })
         
         # SENSITIVE_READ_ONLY: Networking operations that could expose sensitive information
         self.sensitive_read_only.update({
             # Route53 - DNS configuration details
-            ("route53.amazonaws.com", "GetHostedZone"),
-            ("route53.amazonaws.com", "ListHostedZonesByName"),
-            ("route53.amazonaws.com", "ListQueryLoggingConfigs"),
-            ("route53.amazonaws.com", "ListTagsForResource"),
-            ("route53.amazonaws.com", "ListTrafficPolicies"),
-            ("route53.amazonaws.com", "GetHealthCheck"),
-            ("route53.amazonaws.com", "ListHealthChecks"),
+            ("route53.amazonaws.com", "ListHostedZones"),                    # Hosted zone inventory - DNS zone listing
+            ("route53.amazonaws.com", "ListHostedZonesByName"),              # Hosted zones by name - DNS zone lookup
+            ("route53.amazonaws.com", "ListQueryLoggingConfigs"),            # DNS query logging - DNS monitoring configuration
+            ("route53.amazonaws.com", "ListResourceRecordSets"),             # DNS records - zone file contents
+            ("route53.amazonaws.com", "ListTagsForResource"),               # DNS resource tags - zone metadata
+            ("route53.amazonaws.com", "ListTrafficPolicies"),               # Traffic policies - DNS routing rules
             
             # Route53 Resolver - DNS security configuration
-            ("route53resolver.amazonaws.com", "ListFirewallDomainLists"),
-            ("route53resolver.amazonaws.com", "ListFirewallRuleGroupAssociations"),
-            ("route53resolver.amazonaws.com", "ListFirewallRuleGroups"),
+            ("route53resolver.amazonaws.com", "ListFirewallDomainLists"),    # DNS firewall domains - DNS security rules
+            ("route53resolver.amazonaws.com", "ListFirewallRuleGroupAssociations"), # DNS firewall associations - security rule mapping
+            ("route53resolver.amazonaws.com", "ListFirewallRuleGroups"),     # DNS firewall rule groups - security rule collections
             
             # Network Firewall - Security configuration
-            ("network-firewall.amazonaws.com", "DescribeRuleGroupMetadata"),
-            ("network-firewall.amazonaws.com", "ListFirewallPolicies"),
-            ("network-firewall.amazonaws.com", "ListFirewalls"),
-            ("network-firewall.amazonaws.com", "ListRuleGroups"),
-            ("network-firewall.amazonaws.com", "ListTLSInspectionConfigurations"),
+            ("network-firewall.amazonaws.com", "DescribeRuleGroupMetadata"), # Firewall rule metadata - network security rules
+            ("network-firewall.amazonaws.com", "ListFirewallPolicies"),      # Firewall policies - network security policies
+            ("network-firewall.amazonaws.com", "ListFirewalls"),             # Firewall inventory - network security devices
+            ("network-firewall.amazonaws.com", "ListRuleGroups"),            # Firewall rule groups - security rule collections
+            ("network-firewall.amazonaws.com", "ListTLSInspectionConfigurations"), # TLS inspection configs - SSL/TLS security settings
             
             # VPC Lattice - Network service discovery
-            ("vpc-lattice.amazonaws.com", "ListServices"),
-            ("vpc-lattice.amazonaws.com", "ListTargetGroups"),
+            ("vpc-lattice.amazonaws.com", "ListServices"),                   # Lattice services - service-to-service networking
+            ("vpc-lattice.amazonaws.com", "ListTargetGroups"),               # Lattice target groups - service routing targets
             
             # API Gateway - API configuration
-            ("apigateway.amazonaws.com", "GetRestApi"),
-            ("apigateway.amazonaws.com", "GetRestApis"),
-            ("apigateway.amazonaws.com", "GetResource"),
-            ("apigateway.amazonaws.com", "GetResources"),
-            ("apigateway.amazonaws.com", "GetMethod"),
-            ("apigateway.amazonaws.com", "GetIntegration"),
-            ("apigateway.amazonaws.com", "GetApiKey"),
-            ("apigateway.amazonaws.com", "GetApiKeys"),
-            ("apigateway.amazonaws.com", "GetUsagePlan"),
-            ("apigateway.amazonaws.com", "GetUsagePlans"),
+            ("apigateway.amazonaws.com", "GetRestApi"),                     # REST API details - API configuration and endpoints
+            ("apigateway.amazonaws.com", "GetResource"),                    # API resource details - endpoint configuration
+            ("apigateway.amazonaws.com", "GetMethod"),                      # API method details - HTTP method configuration
+            ("apigateway.amazonaws.com", "GetIntegration"),                 # API integration details - backend service connections
+            ("apigateway.amazonaws.com", "GetApiKey"),                      # API key details - authentication credentials
+            ("apigateway.amazonaws.com", "GetApiKeys"),                     # API key inventory - authentication credential listing
+            ("apigateway.amazonaws.com", "GetUsagePlan"),                   # Usage plan details - API rate limiting and quotas
+            ("apigateway.amazonaws.com", "GetUsagePlans"),                  # Usage plan inventory - API rate limiting policies
             ("apigateway.amazonaws.com", "GetVpcLink"),
             ("apigateway.amazonaws.com", "GetVpcLinks"),
             ("apigateway.amazonaws.com", "GetDomainName"),
@@ -102,10 +120,13 @@ class NetworkingEventClassifier(BaseEventClassifier):
             ("apigateway.amazonaws.com", "GetRequestValidator"),
             ("apigateway.amazonaws.com", "GetRequestValidators"),
             ("apigateway.amazonaws.com", "GetStage"),
-            ("apigateway.amazonaws.com", "GetStages"),
+            ("apigateway.amazonaws.com", "GetAccount"),
+            ("apigateway.amazonaws.com", "GetApi"),
+            ("apigateway.amazonaws.com", "GetApis"),
+            ("apigateway.amazonaws.com", "GetIntegrations"),
+            ("apigateway.amazonaws.com", "GetRoutes"),
             
             # Load Balancer - Load balancer configuration
-            ("elasticloadbalancing.amazonaws.com", "DescribeLoadBalancers"),
             ("elasticloadbalancing.amazonaws.com", "DescribeTargetGroups"),
             ("elasticloadbalancing.amazonaws.com", "DescribeTargetHealth"),
             ("elasticloadbalancing.amazonaws.com", "DescribeListeners"),
@@ -207,13 +228,11 @@ class NetworkingEventClassifier(BaseEventClassifier):
             # API Gateway - Unusual API operations
             ("apigateway.amazonaws.com", "GetUsage"),
             ("apigateway.amazonaws.com", "GetUsagePlanKey"),
-        })
-        
-        # INFRA_READS: Infrastructure networking management
-        self.infra_reads.update({
-            # Load Balancer - Infrastructure load balancing
+            
+            # Load Balancer - Infrastructure load balancing (moved back from infra_reads)
             ("elasticloadbalancing.amazonaws.com", "DescribeLoadBalancers"),
             
-            # Service Discovery - Infrastructure service discovery
+            # Service Discovery - Infrastructure service discovery (moved back from infra_reads)
             ("servicediscovery.amazonaws.com", "ListNamespaces"),
         })
+        

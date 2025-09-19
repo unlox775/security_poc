@@ -18,7 +18,29 @@ class SimpleStorageEventClassifier(BaseEventClassifier):
     """
     
     def _initialize_rules(self):
-        """Initialize classification rules for simple storage services."""
+        """Initialize classification rules for simple storage services.
+        
+        Classification Guidelines:
+        
+        SAFE_READ_ONLY: Operations that expose fundamentally public or harmless information.
+        - No external references that could be exploited
+        - Information that would be safe if publicly accessible
+        - Examples: availability zones, regions, basic account attributes
+        
+        SENSITIVE_READ_ONLY: Operations that expose information useful for exploitation.
+        - Reading reveals exploitable details (IP addresses, security rules, etc.)
+        - Information that enables direct connection or attack vectors
+        - Examples: security groups with IP addresses, instance details with public IPs
+        
+        HACKING_READS: Classic reconnaissance operations for gaining exploitation intel.
+        - Standard penetration testing activities
+        - Gathering information to enable later exploitation
+        - Examples: enumerating security groups, finding public instances, backup configs
+        
+        SENSITIVE_WRITE: Operations that modify or create resources.
+        - Any operation that changes system state
+        - Examples: creating instances, modifying configurations
+        """
         self.handled_sources = {
             "s3.amazonaws.com",              # Simple Storage Service for object storage
             "elasticache.amazonaws.com"      # ElastiCache for in-memory data caching
@@ -44,7 +66,6 @@ class SimpleStorageEventClassifier(BaseEventClassifier):
             ("s3.amazonaws.com", "GetBucketLocation"),
             ("s3.amazonaws.com", "GetBucketLogging"),
             ("s3.amazonaws.com", "GetBucketNotification"),
-            ("s3.amazonaws.com", "GetBucketPolicyStatus"),
             ("s3.amazonaws.com", "GetBucketWebsite"),
             ("s3.amazonaws.com", "GetObject"),
             ("s3.amazonaws.com", "GetObjectAcl"),
@@ -52,8 +73,8 @@ class SimpleStorageEventClassifier(BaseEventClassifier):
             ("s3.amazonaws.com", "ListObjects"),
             ("s3.amazonaws.com", "ListObjectsV2"),
             ("s3.amazonaws.com", "GetAccountPublicAccessBlock"),
-            ("s3.amazonaws.com", "ListAllMyBuckets"),
-            ("s3.amazonaws.com", "GetBucketPolicyStatus"),
+            ("s3.amazonaws.com", "GetBucketObjectLockConfiguration"),
+            ("s3.amazonaws.com", "GetBucketOwnershipControls"),
             
             # ElastiCache - Cache information
             ("elasticache.amazonaws.com", "DescribeCacheClusters"),
@@ -128,12 +149,3 @@ class SimpleStorageEventClassifier(BaseEventClassifier):
             ("s3.amazonaws.com", "ListBucketAnalyticsConfigurations"),
         })
         
-        # INFRA_READS: Infrastructure storage management
-        self.infra_reads.update({
-            # S3 - Infrastructure storage management
-            ("s3.amazonaws.com", "GetAccountPublicAccessBlock"),
-            
-            # ElastiCache - Infrastructure cache management
-            ("elasticache.amazonaws.com", "DescribeCacheClusters"),
-            ("elasticache.amazonaws.com", "DescribeReplicationGroups"),
-        })
