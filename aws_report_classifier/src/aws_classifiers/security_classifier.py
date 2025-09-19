@@ -57,131 +57,126 @@ class SecurityEventClassifier(BaseEventClassifier):
         
         # SAFE_READ_ONLY: Basic security information that doesn't expose sensitive data
         self.safe_read_only.update({
-            # Trusted Advisor - Basic advisor information
-            ("trusted-advisor.amazonaws.com", "DescribeTrustedAdvisorCheckSummaries"),
-            ("trusted-advisor.amazonaws.com", "DescribeTrustedAdvisorChecks"),
         })
         
         # SENSITIVE_READ_ONLY: Security operations that could expose sensitive information
         self.sensitive_read_only.update({
-            # Access Analyzer - Access analysis
-            ("access-analyzer.amazonaws.com", "ListAnalyzers"),
-            ("access-analyzer.amazonaws.com", "GetAnalyzer"),
-            ("access-analyzer.amazonaws.com", "GetFinding"),
-            
+            # Trusted Advisor - Basic advisor information
+            ("trusted-advisor.amazonaws.com", "DescribeTrustedAdvisorCheckSummaries"), # ✅ Trusted Advisor summaries - security best practice summaries
+            ("trusted-advisor.amazonaws.com", "DescribeTrustedAdvisorChecks"),         # ✅ Trusted Advisor checks - security best practice checks
+
             # Config - Configuration compliance
-            ("config.amazonaws.com", "GetComplianceDetailsByConfigRule"),
-            ("config.amazonaws.com", "GetComplianceDetailsByResource"),
-            ("config.amazonaws.com", "GetComplianceSummaryByConfigRule"),
-            ("config.amazonaws.com", "GetComplianceSummaryByResourceType"),
-            ("config.amazonaws.com", "GetComplianceSummaryByResourceId"),
-            ("config.amazonaws.com", "GetAggregateComplianceDetailsByConfigRule"),
-            ("config.amazonaws.com", "GetAggregateComplianceSummaryByConfigRule"),
-            ("config.amazonaws.com", "GetAggregateComplianceSummaryByResourceType"),
-            ("config.amazonaws.com", "GetAggregateComplianceSummaryByResourceId"),
-            ("config.amazonaws.com", "DescribePendingAggregationRequests"),
-            
-            # GuardDuty - Threat detection
-            ("guardduty.amazonaws.com", "ListDetectors"),
-            ("guardduty.amazonaws.com", "GetFindingsStatistics"),
-            ("guardduty.amazonaws.com", "ListMembers"),
-            ("guardduty.amazonaws.com", "GetMembers"),
-            
-            # Security Hub - Security findings
-            ("securityhub.amazonaws.com", "GetInsights"),
-            ("securityhub.amazonaws.com", "ListInsights"),
-            ("securityhub.amazonaws.com", "GetMembers"),
-            ("securityhub.amazonaws.com", "ListMembers"),
-            
-            # Inspector - Vulnerability assessment
-            ("inspector.amazonaws.com", "ListAssessmentTargets"),
-            ("inspector.amazonaws.com", "ListAssessmentTemplates"),
-            ("inspector.amazonaws.com", "ListAssessmentRuns"),
-            ("inspector.amazonaws.com", "DescribeAssessmentTargets"),
-            ("inspector.amazonaws.com", "DescribeAssessmentTemplates"),
-            ("inspector.amazonaws.com", "DescribeAssessmentRuns"),
-            ("inspector.amazonaws.com", "ListFindings"),
-            ("inspector.amazonaws.com", "DescribeFindings"),
-            
-            # Macie - Data discovery and classification
-            ("macie.amazonaws.com", "ListS3Resources"),
-            ("macie.amazonaws.com", "DescribeS3Resources"),
-            ("macie.amazonaws.com", "ListMemberAccounts"),
-            ("macie.amazonaws.com", "ListS3Resources"),
-            
+            ("config.amazonaws.com", "GetComplianceDetailsByConfigRule"),     # ✅ Compliance details by rule - configuration compliance analysis
+            ("config.amazonaws.com", "GetComplianceDetailsByResource"),       # ✅ Compliance details by resource - resource compliance analysis
+            ("config.amazonaws.com", "GetComplianceSummaryByConfigRule"),     # ✅ Compliance summary by rule - rule compliance summary
+            ("config.amazonaws.com", "GetComplianceSummaryByResourceType"),   # ✅ Compliance summary by type - resource type compliance summary
+            ("config.amazonaws.com", "GetComplianceSummaryByResourceId"),     # ✅ Compliance summary by ID - resource compliance summary
+            ("config.amazonaws.com", "GetAggregateComplianceDetailsByConfigRule"), # ✅ Aggregate compliance details - multi-account compliance analysis
+            ("config.amazonaws.com", "GetAggregateComplianceSummaryByConfigRule"), # ✅ Aggregate compliance summary - multi-account compliance summary
+            ("config.amazonaws.com", "GetAggregateComplianceSummaryByResourceType"), # ✅ Aggregate compliance summary by type - multi-account resource type summary
+            ("config.amazonaws.com", "GetAggregateComplianceSummaryByResourceId"), # ✅ Aggregate compliance summary by ID - multi-account resource summary
+            ("config.amazonaws.com", "DescribePendingAggregationRequests"),   # ✅ Pending aggregation requests - multi-account aggregation status            
         })
         
         # SENSITIVE_WRITE: Security operations that modify configurations
         self.sensitive_write.update({
             # Access Analyzer - Access analysis configuration
-            ("access-analyzer.amazonaws.com", "CreateAnalyzer"),
-            ("access-analyzer.amazonaws.com", "DeleteAnalyzer"),
-            ("access-analyzer.amazonaws.com", "StartPolicyGeneration"),
-            ("access-analyzer.amazonaws.com", "CancelPolicyGeneration"),
+            ("access-analyzer.amazonaws.com", "CreateAnalyzer"),             # ✅ Create analyzer - access analysis setup
+            ("access-analyzer.amazonaws.com", "DeleteAnalyzer"),             # ✅ Delete analyzer - access analysis removal
+            ("access-analyzer.amazonaws.com", "StartPolicyGeneration"),      # ✅ Start policy generation - access policy analysis initiation
+            ("access-analyzer.amazonaws.com", "CancelPolicyGeneration"),     # ✅ Cancel policy generation - access policy analysis termination
             
             # Config - Configuration management
-            ("config.amazonaws.com", "PutConfigurationRecorder"),
-            ("config.amazonaws.com", "DeleteConfigurationRecorder"),
-            ("config.amazonaws.com", "PutConfigRule"),
-            ("config.amazonaws.com", "DeleteConfigRule"),
-            ("config.amazonaws.com", "StartConfigRulesEvaluation"),
-            ("config.amazonaws.com", "StopConfigRulesEvaluation"),
+            ("config.amazonaws.com", "PutConfigurationRecorder"),            # ✅ Put configuration recorder - configuration tracking setup
+            ("config.amazonaws.com", "DeleteConfigurationRecorder"),         # ✅ Delete configuration recorder - configuration tracking removal
+            ("config.amazonaws.com", "PutConfigRule"),                       # ✅ Put config rule - compliance rule creation
+            ("config.amazonaws.com", "DeleteConfigRule"),                    # ✅ Delete config rule - compliance rule removal
+            ("config.amazonaws.com", "StartConfigRulesEvaluation"),          # ✅ Start config rules evaluation - compliance evaluation initiation
+            ("config.amazonaws.com", "StopConfigRulesEvaluation"),           # ✅ Stop config rules evaluation - compliance evaluation termination
             
             # GuardDuty - Threat detection configuration
-            ("guardduty.amazonaws.com", "CreateDetector"),
-            ("guardduty.amazonaws.com", "DeleteDetector"),
-            ("guardduty.amazonaws.com", "UpdateDetector"),
-            ("guardduty.amazonaws.com", "CreateMembers"),
-            ("guardduty.amazonaws.com", "DeleteMembers"),
-            ("guardduty.amazonaws.com", "UpdateMembers"),
+            ("guardduty.amazonaws.com", "CreateDetector"),                   # ✅ Create detector - threat detection setup
+            ("guardduty.amazonaws.com", "DeleteDetector"),                   # ✅ Delete detector - threat detection removal
+            ("guardduty.amazonaws.com", "UpdateDetector"),                   # ✅ Update detector - threat detection modification
+            ("guardduty.amazonaws.com", "CreateMembers"),                    # ✅ Create members - GuardDuty member setup
+            ("guardduty.amazonaws.com", "DeleteMembers"),                    # ✅ Delete members - GuardDuty member removal
+            ("guardduty.amazonaws.com", "UpdateMembers"),                    # ✅ Update members - GuardDuty member modification
             
             # Security Hub - Security findings management
-            ("securityhub.amazonaws.com", "CreateInsight"),
-            ("securityhub.amazonaws.com", "DeleteInsight"),
-            ("securityhub.amazonaws.com", "UpdateInsight"),
-            ("securityhub.amazonaws.com", "CreateMembers"),
-            ("securityhub.amazonaws.com", "DeleteMembers"),
-            ("securityhub.amazonaws.com", "InviteMembers"),
-            ("securityhub.amazonaws.com", "DisassociateMembers"),
+            ("securityhub.amazonaws.com", "CreateInsight"),                  # ✅ Create insight - security insight creation
+            ("securityhub.amazonaws.com", "DeleteInsight"),                  # ✅ Delete insight - security insight removal
+            ("securityhub.amazonaws.com", "UpdateInsight"),                  # ✅ Update insight - security insight modification
+            ("securityhub.amazonaws.com", "CreateMembers"),                  # ✅ Create members - Security Hub member setup
+            ("securityhub.amazonaws.com", "DeleteMembers"),                  # ✅ Delete members - Security Hub member removal
+            ("securityhub.amazonaws.com", "InviteMembers"),                  # ✅ Invite members - Security Hub member invitation
+            ("securityhub.amazonaws.com", "DisassociateMembers"),            # ✅ Disassociate members - Security Hub member disassociation
             
             # Inspector - Vulnerability assessment configuration
-            ("inspector.amazonaws.com", "CreateAssessmentTarget"),
-            ("inspector.amazonaws.com", "DeleteAssessmentTarget"),
-            ("inspector.amazonaws.com", "CreateAssessmentTemplate"),
-            ("inspector.amazonaws.com", "DeleteAssessmentTemplate"),
-            ("inspector.amazonaws.com", "StartAssessmentRun"),
-            ("inspector.amazonaws.com", "StopAssessmentRun"),
+            ("inspector.amazonaws.com", "CreateAssessmentTarget"),           # ✅ Create assessment target - vulnerability assessment target creation
+            ("inspector.amazonaws.com", "DeleteAssessmentTarget"),           # ✅ Delete assessment target - vulnerability assessment target removal
+            ("inspector.amazonaws.com", "CreateAssessmentTemplate"),         # ✅ Create assessment template - vulnerability assessment template creation
+            ("inspector.amazonaws.com", "DeleteAssessmentTemplate"),         # ✅ Delete assessment template - vulnerability assessment template removal
+            ("inspector.amazonaws.com", "StartAssessmentRun"),               # ✅ Start assessment run - vulnerability assessment run initiation
+            ("inspector.amazonaws.com", "StopAssessmentRun"),                # ✅ Stop assessment run - vulnerability assessment run termination
             
             # Macie - Data discovery configuration
-            ("macie.amazonaws.com", "AssociateS3Resources"),
-            ("macie.amazonaws.com", "DisassociateS3Resources"),
-            ("macie.amazonaws.com", "UpdateS3Resources"),
+            ("macie.amazonaws.com", "AssociateS3Resources"),                 # ✅ Associate S3 resources - data discovery S3 resource association
+            ("macie.amazonaws.com", "DisassociateS3Resources"),              # ✅ Disassociate S3 resources - data discovery S3 resource disassociation
+            ("macie.amazonaws.com", "UpdateS3Resources"),                    # ✅ Update S3 resources - data discovery S3 resource modification
             
         })
         
         # HACKING_READS: Operations that could be used for security reconnaissance
         self.hacking_reads.update({
-            # Access Analyzer - Policy analysis for privilege escalation
-            ("access-analyzer.amazonaws.com", "ListPolicyGenerations"),
-            ("access-analyzer.amazonaws.com", "GetPolicyGeneration"),
+            # Access Analyzer - Access analysis
+            ("access-analyzer.amazonaws.com", "ListAnalyzers"),               # ✅ Analyzers - access analyzer inventory (administrative inventory, not exploitable - should be safe read)
+            ("access-analyzer.amazonaws.com", "GetAnalyzer"),                 # ✅ Analyzer details - access analyzer configuration
+            ("access-analyzer.amazonaws.com", "GetFinding"),                  # ✅ Finding details - access vulnerability findings (should be hacking reads)
+            ("access-analyzer.amazonaws.com", "ListPolicyGenerations"),       # ✅ Policy generations - access policy analysis reconnaissance
+            ("access-analyzer.amazonaws.com", "GetPolicyGeneration"),         # ✅ Policy generation details - access policy analysis details
             
+            # GuardDuty - Threat detection
+            ("guardduty.amazonaws.com", "ListDetectors"),                     # ✅ Detectors - threat detection inventory (administrative inventory, not exploitable - should be safe read)
+            ("guardduty.amazonaws.com", "GetFindingsStatistics"),             # ✅ Findings statistics - threat detection statistics
+            ("guardduty.amazonaws.com", "ListMembers"),                       # ✅ Members - GuardDuty member inventory (administrative inventory, not exploitable - should be safe read)
+            ("guardduty.amazonaws.com", "GetMembers"),                        # ✅ Member details - GuardDuty member configuration
+            ("guardduty.amazonaws.com", "GetDetector"),                      # ✅ Detector details - threat detection configuration analysis
+            ("guardduty.amazonaws.com", "ListFindings"),                     # ✅ Threat findings - security threat findings (should be hacking reads)
+            
+            # Security Hub - Security findings
+            ("securityhub.amazonaws.com", "GetInsights"),                     # ✅ Security insights - security finding insights
+            ("securityhub.amazonaws.com", "ListInsights"),                    # ✅ Security insights - security insight inventory (administrative inventory, not exploitable - should be safe read)
+            ("securityhub.amazonaws.com", "GetMembers"),                      # ✅ Security Hub members - security hub member configuration
+            ("securityhub.amazonaws.com", "ListMembers"),                     # ✅ Security Hub members - security hub member inventory (administrative inventory, not exploitable - should be safe read)
+            ("securityhub.amazonaws.com", "GetFindings"),                    # ✅ Security findings - security finding analysis (should be hacking reads)
+            ("securityhub.amazonaws.com", "ListFindings"),                   # ✅ Security findings - security finding reconnaissance (should be hacking reads)
+
+            # Trusted Advisor - Security best practice checks
+            ("trusted-advisor.amazonaws.com", "DescribeTrustedAdvisorCheckResult"), # ✅ Trusted Advisor results - security best practice check results
+
+            # Inspector - Vulnerability assessment
+            ("inspector.amazonaws.com", "ListAssessmentTargets"),             # ✅ Assessment targets - vulnerability assessment target inventory (administrative inventory, not exploitable - should be safe read)
+            ("inspector.amazonaws.com", "ListAssessmentTemplates"),           # ✅ Assessment templates - vulnerability assessment template inventory (administrative inventory, not exploitable - should be safe read)
+            ("inspector.amazonaws.com", "ListAssessmentRuns"),                # ✅ Assessment runs - vulnerability assessment run inventory (administrative inventory, not exploitable - should be safe read)
+            ("inspector.amazonaws.com", "DescribeAssessmentTargets"),         # ✅ Assessment target details - vulnerability assessment target configuration
+            ("inspector.amazonaws.com", "DescribeAssessmentTemplates"),       # ✅ Assessment template details - vulnerability assessment template configuration
+            ("inspector.amazonaws.com", "DescribeAssessmentRuns"),            # ✅ Assessment run details - vulnerability assessment run configuration
+            ("inspector.amazonaws.com", "ListFindings"),                      # ✅ Vulnerability findings - security vulnerability findings (should be hacking reads)
+            ("inspector.amazonaws.com", "DescribeFindings"),                  # ✅ Finding details - security vulnerability analysis (should be hacking reads)
+            
+            # Macie - Data discovery and classification
+            ("macie.amazonaws.com", "ListS3Resources"),                       # ✅ S3 resources - data discovery and classification findings (should be hacking reads)
+            ("macie.amazonaws.com", "DescribeS3Resources"),                   # ✅ S3 resource details - data discovery and classification analysis (should be hacking reads)
+            ("macie.amazonaws.com", "ListMemberAccounts"),                    # ✅ Member accounts - Macie member inventory (administrative inventory, not exploitable - should be safe read)
+            ("macie.amazonaws.com", "ListS3Resources"),                       # ✅ S3 resources - data discovery and classification findings (should be hacking reads)
+
             # Config - Configuration reconnaissance
-            ("config.amazonaws.com", "DescribeConfigurationRecorders"),
-            ("config.amazonaws.com", "DescribeConfigRules"),
-            ("config.amazonaws.com", "ListConfigurationRecorders"),
-            
-            # GuardDuty - Security posture analysis
-            ("guardduty.amazonaws.com", "GetDetector"),
-            ("guardduty.amazonaws.com", "ListFindings"),
-            
-            # Security Hub - Security findings analysis
-            ("securityhub.amazonaws.com", "GetFindings"),
-            ("securityhub.amazonaws.com", "ListFindings"),
+            ("config.amazonaws.com", "DescribeConfigurationRecorders"),       # ✅ Configuration recorders - configuration tracking reconnaissance
+            ("config.amazonaws.com", "DescribeConfigRules"),                 # ✅ Configuration rules - compliance rule reconnaissance
+            ("config.amazonaws.com", "ListConfigurationRecorders"),          # ✅ Configuration recorders - configuration tracking inventory (administrative inventory, not exploitable - should be safe read)
         })
         
         # STRANGE_READS: Unusual security operations
         self.strange_reads.update({
-            # Trusted Advisor - Unusual advisor checks
-            ("trusted-advisor.amazonaws.com", "DescribeTrustedAdvisorCheckResult"),
         })
         
