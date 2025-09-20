@@ -83,6 +83,9 @@ class IdentityEventClassifier(BaseEventClassifier):
             ("sso.amazonaws.com", "GetSSOStatus"),                          # ✅ SSO status - public SSO service status (administrative status, not exploitable - should be safe read)
             ("sso.amazonaws.com", "ListInstances"),                         # ✅ SSO instances - SSO service inventory (administrative inventory, not exploitable - should be safe read)
 
+            # STS - Token and identity information
+            ("sts.amazonaws.com", "GetCallerIdentity"),                      # ✅ Caller identity - current identity context
+
             # Organizations - Organization information
             ("organizations.amazonaws.com", "ListTagsForResource"),         # ✅ Resource tags - organizational metadata (administrative metadata, not exploitable - should be safe read)
             ("organizations.amazonaws.com", "ListAccounts"),                # ✅ Account inventory - organization account list (administrative inventory, not exploitable - should be safe read)
@@ -133,7 +136,6 @@ class IdentityEventClassifier(BaseEventClassifier):
             ("organizations.amazonaws.com", "ListParents"),                 # ✅ Parent accounts - account hierarchy relationships
             
             # STS - Token and identity information
-            ("sts.amazonaws.com", "GetCallerIdentity"),                      # ✅ Caller identity - current identity context
             ("sts.amazonaws.com", "AssumeRoleWithSAML"),                     # ✅ SAML role assumption - federated identity role access
             ("sts.amazonaws.com", "AssumeRole"),                             # ✅ Role assumption - cross-account role access
             ("sts.amazonaws.com", "AssumeRoleWithWebIdentity"),              # ✅ Web identity role assumption - OIDC federated access

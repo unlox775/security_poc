@@ -84,7 +84,6 @@ class MonitoringEventClassifier(BaseEventClassifier):
         # SENSITIVE_READ_ONLY: Monitoring operations that could expose sensitive information
         self.sensitive_read_only.update({
             # Logs - Log analysis and filtering
-            ("logs.amazonaws.com", "DescribeMetricFilters"),                 # ✅ Metric filters - log filtering configuration
             ("logs.amazonaws.com", "DescribeQueries"),                       # ✅ Log queries - log query configuration
             ("logs.amazonaws.com", "GetLogGroupFields"),                     # ✅ Log group fields - log structure information
             ("logs.amazonaws.com", "DescribeAccountPolicies"),               # ✅ Account policies - log account access policies

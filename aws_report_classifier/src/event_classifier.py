@@ -47,6 +47,7 @@ class EventClassifier:
         self.dashboard_reads = {
             # High-frequency events that appear on dashboard loads
             ("notifications.amazonaws.com", "ListNotificationEvents"),
+            ("logs.amazonaws.com", "DescribeMetricFilters"),
             ("notifications.amazonaws.com", "GetFeatureOptInStatus"),
             ("notifications.amazonaws.com", "ListNotificationHubs"),
             ("ec2.amazonaws.com", "DescribeRegions"),

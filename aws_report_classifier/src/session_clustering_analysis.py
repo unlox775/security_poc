@@ -363,6 +363,27 @@ class SessionClusteringAnalyzer:
         cleaned = service_name.replace('.amazonaws.com', '')
         return cleaned
     
+    def clean_username_for_filename(self, username):
+        """
+        Clean username for use in filename by stripping dots for names 4+ characters
+        
+        Args:
+            username (str): Original username
+            
+        Returns:
+            str: Cleaned username for filename
+        """
+        if not username or username == 'root':
+            return username
+            
+        # If name has a dot and the part before the dot is 4+ characters, use just that part
+        if '.' in username:
+            name_part = username.split('.')[0]
+            if len(name_part) >= 4:
+                return name_part
+                
+        return username
+
     def extract_user_info(self, user_type, user_arn, user_name):
         """
         Extract user type from userIdentity.type, ARN or username
@@ -514,11 +535,15 @@ class SessionClusteringAnalyzer:
         )
         users = session_df['user_type'].unique()
         
-        # Create user list for filename - use 'multiple' if more than 2 users
-        if len(users) > 2:
+        # Create user list for filename - use 'multiple' if more than 1 user
+        if len(users) > 1:
             users_list = 'multiple'
         else:
-            users_list = ', '.join(sorted(users))
+            # Clean the single username for filename
+            users_list = self.clean_username_for_filename(users[0])
+        
+        # Create full user list for summary (keep original names)
+        users_summary = ', '.join(sorted(users))
         
         # Determine source files involved
         source_files = session_df['source_file'].unique()
@@ -534,7 +559,10 @@ class SessionClusteringAnalyzer:
         time_str = start_time_pst.strftime('%H-%M')
         duration_str = f"{duration_hours:.1f}"
         
-        filename = f"{date_str}_{time_str}_duration_{duration_str}hr-{source_indicator}-{users_list}"
+        # Check if session contains any HACKING_READS events
+        hack_suffix = "-HACK" if classification_counts.get('HACKING_READS', 0) > 0 else ""
+        
+        filename = f"{date_str}_{time_str}_duration_{duration_str}hr-{source_indicator}-{users_list}{hack_suffix}"
         
         # Create session summary
         summary = {
@@ -546,7 +574,7 @@ class SessionClusteringAnalyzer:
             'total_events': len(session_df),
             'classification_counts': classification_counts,
             'services': services_list,
-            'users': users_list,
+            'users': users_summary,  # Full user names for summary
             'source_files': source_indicator,
             'session_data': session_df
         }
