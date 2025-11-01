@@ -7,6 +7,7 @@ import time
 import csv
 from io import StringIO
 import argparse
+import ipaddress
 
 CACHE_DB = 'ip_cache.sqlite'
 API_URL = 'http://ip-api.com/json/'
@@ -35,6 +36,15 @@ def init_db():
     return conn
 
 
+def is_valid_ip(ip_str):
+    """Check if the string is a valid IP address (IPv4 or IPv6)."""
+    try:
+        ipaddress.ip_address(ip_str)
+        return True
+    except ValueError:
+        return False
+
+
 def get_cached_location(conn, ip):
     c = conn.cursor()
     c.execute('SELECT location FROM ip_cache WHERE ip = ?', (ip,))
@@ -50,9 +60,22 @@ def cache_location(conn, ip, location):
 
 
 def lookup_ip(ip):
+    """
+    Look up IP address location. Returns the location string on success,
+    or None on error (to avoid caching errors).
+    """
     try:
         resp = requests.get(f'{API_URL}{ip}?fields={API_FIELDS}', timeout=5)
-        data = resp.json()
+        # Handle empty or invalid JSON responses
+        if not resp.text or resp.text.strip() == '':
+            return None
+        
+        try:
+            data = resp.json()
+        except ValueError:
+            # JSON parsing failed, don't cache this
+            return None
+            
         if data.get('status') == 'success':
             city = data.get('city')
             region = data.get('regionName')
@@ -61,9 +84,11 @@ def lookup_ip(ip):
             location = ', '.join(filter(None, [city, region, country]))
             return location if location else 'Unknown'
         else:
-            return f"Error: {data.get('message', 'Unknown error')}"
+            # API returned an error status, don't cache
+            return None
     except Exception as e:
-        return f"Error: {e}"
+        # Network or other error, don't cache
+        return None
 
 
 def csv_escape(value):
@@ -106,6 +131,12 @@ def main():
         ip = ip.strip()
         if not ip:
             continue
+        
+        # Validate IP address - if invalid, skip it (will be blank in output)
+        if not is_valid_ip(ip):
+            ip_to_location[ip] = ''
+            continue
+            
         cached = get_cached_location(conn, ip)
         if cached is not None:
             ip_to_location[ip] = cached
@@ -114,8 +145,15 @@ def main():
                 sys.stderr.write(f"[ip_region_lookup] Looking up IP: {ip}\n")
                 sys.stderr.flush()
             location = lookup_ip(ip)
-            cache_location(conn, ip, location)
-            ip_to_location[ip] = location
+            
+            # Only cache successful lookups (not None/errors)
+            if location is not None:
+                cache_location(conn, ip, location)
+                ip_to_location[ip] = location
+            else:
+                # Lookup failed, leave blank (don't cache)
+                ip_to_location[ip] = ''
+            
             time.sleep(SLEEP_BETWEEN_REQUESTS)
 
     for ip in ips:
@@ -123,11 +161,11 @@ def main():
         if not ip_stripped:
             print('\t' if args.tsv else ',')
         else:
-            location = ip_to_location.get(ip_stripped, "Unknown")
+            location = ip_to_location.get(ip_stripped, "")
             if args.tsv:
-                print(f'{ip}\t{tsv_escape(location)}')
+                print(f'{ip}\t{tsv_escape(location) if location else ""}')
             else:
-                print(f'{ip},{csv_escape(location)}')
+                print(f'{ip},{csv_escape(location) if location else ""}')
 
 if __name__ == '__main__':
     main() 
