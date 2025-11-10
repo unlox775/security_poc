@@ -4,6 +4,7 @@ import requests
 import os
 import sys
 import json
+from datetime import datetime
 
 # library to to CSV format
 import csv
@@ -81,13 +82,18 @@ def prepare_csv(domain, data, all_classes):
     for person, breaches in data.items():
         email = f"{person}@{domain}"
         row = {"person": email}
+        sorted_breaches = sorted(
+            breaches,
+            key=lambda breach: datetime.strptime(breach['BreachDate'], "%Y-%m-%d"),
+            reverse=True,
+        )
         for dataclass in all_classes:
             breach_dates = []
-            for breach in breaches:
+            for breach in sorted_breaches:
                 if dataclass in breach['DataClasses']:
                     breach_dates.append(f"{breach['BreachDate']} at {breach['Name']}")
             row[dataclass] = ", ".join(breach_dates)
-        breach_names = [breach['Name'] for breach in breaches]
+        breach_names = [breach['Name'] for breach in sorted_breaches]
         row["breach_names"] = ", ".join(breach_names)
         final_data.append(row)
 
