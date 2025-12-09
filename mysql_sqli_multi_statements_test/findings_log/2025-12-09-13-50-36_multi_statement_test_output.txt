@@ -1,0 +1,67 @@
+================================================================================
+Multi-Statement SQL Injection Test
+================================================================================
+
+Setup complete:
+  - test_users table created with 3 users
+  - hacker_target table created with initial value
+
+Initial hacker_target value: original_value
+
+================================================================================
+TEST 1: Basic exists? with array parameter (vulnerable pattern)
+================================================================================
+Result: true
+SQL executed successfully (no multi-statement)
+
+================================================================================
+TEST 2: Semicolon + UPDATE injection (from Secure Ruby PDF example)
+================================================================================
+Payload: ["1=1);UPDATE hacker_target SET message='hacker_was_here', modified_at=NOW() WHERE id=1; --"]
+Expected SQL: SELECT 1 AS one FROM test_users WHERE (1=1);UPDATE hacker_target SET message='hacker_was_here', modified_at=NOW() WHERE id=1; --) LIMIT 1
+
+ERROR: ActiveRecord::StatementInvalid: Mysql2::Error: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'UPDATE hacker_target SET message='hacker_was_here', modified_at=NOW() WHERE id=1' at line 1
+  This might indicate MySQL blocked the multi-statement
+  Data not modified: original_value
+
+================================================================================
+TEST 3: Comment-based injection (-- comment)
+================================================================================
+Payload: ["1=1);UPDATE hacker_target SET message='comment_test' WHERE id=1;--"]
+ERROR: ActiveRecord::StatementInvalid: Mysql2::Error: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'UPDATE hacker_target SET message='comment_test' WHERE id=1;--) LIMIT 1' at line 1
+
+================================================================================
+TEST 4: Semicolon + INSERT injection
+================================================================================
+Payload: ["1=1);INSERT INTO hacker_target (message, modified_at) VALUES ('inserted_by_hacker', NOW());--"]
+ERROR: ActiveRecord::StatementInvalid: Mysql2::Error: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'INSERT INTO hacker_target (message, modified_at) VALUES ('inserted_by_hacker', N' at line 1
+
+================================================================================
+TEST 5: Direct MySQL2 connection test (bypass ActiveRecord)
+================================================================================
+Testing if MySQL itself allows multi-statements when enabled...
+Result row: {"one"=>1}
+Result row: {"one"=>1}
+Result row: {"one"=>1}
+✓ Direct MySQL multi-statement did not modify data
+
+================================================================================
+TEST 6: Check ActiveRecord connection configuration
+================================================================================
+Could not check connection flags
+
+================================================================================
+FINAL SUMMARY
+================================================================================
+Final hacker_target value: original_value
+
+✓ No data modification detected
+Multi-statement execution appears to be blocked
+This could be due to:
+  - MySQL configuration (multi-statements disabled)
+  - ActiveRecord connection settings
+  - MySQL driver limitations
+
+
+---
+Exit status: 0

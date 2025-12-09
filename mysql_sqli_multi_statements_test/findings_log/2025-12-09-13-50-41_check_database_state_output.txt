@@ -1,0 +1,6 @@
+table_name	row_count
+test_users	2
+hacker_target	1
+
+---
+Exit status: 0

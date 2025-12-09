@@ -1,0 +1,85 @@
+================================================================================
+Direct MySQL Multi-Statement Test
+================================================================================
+
+Purpose: Test multi-statement behavior with MULTI_STATEMENTS flag enabled
+Expected: Multi-statements SHOULD work when flag is enabled (MySQL allows this)
+Security: ActiveRecord does NOT enable this flag by default (protection)
+
+Setting up test tables...
+✓ Tables created
+
+Initial hacker_target.message: original_value
+
+================================================================================
+TEST: Multi-statement query with semicolon
+================================================================================
+Executing:
+SELECT 1 AS one FROM test_users WHERE (1=1);
+UPDATE hacker_target SET message='hacker_was_here', modified_at=NOW() WHERE id=1;
+
+Executing multi-statement query...
+Processing all result sets...
+ERROR: Mysql2::Error: Commands out of sync; you can't run this command now
+
+Error explanation:
+  'Commands out of sync' means:
+    - A multi-statement query was executed
+    - Not all result sets were processed before trying to run another query
+    - This is a MySQL client library requirement
+    - It does NOT mean multi-statements are blocked
+    - The UPDATE may have executed before the error occurred!
+
+Checking data status with fresh connection (to avoid 'out of sync' error)...
+  Query: SELECT message, modified_at FROM hacker_target WHERE id = 1
+  Result: {"message"=>"hacker_was_here", "modified_at"=>2025-12-09 13:50:40 -0800}
+
+✓ EXPECTED: Multi-statement UPDATE executed successfully
+  The UPDATE executed before the 'out of sync' error occurred
+  This is expected when MULTI_STATEMENTS flag is enabled
+
+================================================================================
+INTERIM CHECK: Did multi-statement UPDATE execute?
+================================================================================
+Current data status:
+  message: hacker_was_here
+  modified_at: 2025-12-09 13:50:40 -0800
+
+✓ EXPECTED: Multi-statement UPDATE executed
+   This confirms multi-statements work when MULTI_STATEMENTS flag is enabled
+   This is expected MySQL behavior - the flag allows multiple statements
+
+================================================================================
+TEST: Same query WITHOUT MULTI_STATEMENTS flag
+================================================================================
+ERROR (expected): Mysql2::Error: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'UPDATE hacker_target SET message='hacker_was_here', modified_at=NOW() WHERE id=1' at line 2
+Data status: original_value
+✓ Multi-statement blocked - data unchanged (expected)
+
+================================================================================
+Test Summary
+================================================================================
+✓ Test PASSED - Multi-statements work when MULTI_STATEMENTS flag is enabled (expected)
+
+Summary:
+  - MySQL allows multiple statements when MULTI_STATEMENTS flag is enabled
+  - This is expected MySQL behavior - the flag is a 'foot gun' option
+  - When enabled, UPDATE/DELETE/INSERT can execute in multi-statement queries
+
+Security Protection:
+  - ActiveRecord does NOT enable MULTI_STATEMENTS flag by default
+  - This is the security protection - default behavior blocks multi-statements
+  - If someone enabled this flag in database.yml, write access would be possible
+
+About 'Commands out of sync' error:
+  - This error occurs when you try to run another query before processing
+    all result sets from a multi-statement query
+  - It's a MySQL client library requirement, NOT a security feature
+  - The UPDATE executed BEFORE the error occurred
+  - This confirms multi-statements work when the flag is enabled
+
+Conclusion: Multi-statements work with flag (expected), blocked without flag (protection)
+================================================================================
+
+---
+Exit status: 0
