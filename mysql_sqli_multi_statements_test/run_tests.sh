@@ -2,7 +2,7 @@
 # Test runner using standard command logging tool
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-TOOL_DIR="$(cd "$SCRIPT_DIR/../../__investigation_tools" && pwd)"
+TOOL_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 LOG_DIR="findings_log"
 
 # Set output directory for the tool

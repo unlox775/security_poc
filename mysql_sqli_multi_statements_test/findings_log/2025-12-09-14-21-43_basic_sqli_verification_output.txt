@@ -46,10 +46,10 @@ Expected SQL: SELECT 1 AS one FROM test_users WHERE ('test') OR sleep(2) OR ('x'
 Executing query...
 
 Result: false
-Elapsed time: 4.18s
+Elapsed time: 4.15s
 
 Status: PASS - sleep() executed, confirming SQL injection
-         Query took ~4.18s (expected ~2s) - sleep() worked!
+         Query took ~4.15s (expected ~2s) - sleep() worked!
 
 
 ================================================================================

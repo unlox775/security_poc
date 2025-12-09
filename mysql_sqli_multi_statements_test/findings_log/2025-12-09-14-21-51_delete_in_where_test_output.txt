@@ -3,7 +3,7 @@ DELETE in WHERE Clause Test
 ================================================================================
 
 Setting up test tables...
-DEBUG -- :   TestUser Count (0.5ms)  SELECT COUNT(*) FROM `test_users`
+DEBUG -- :   TestUser Count (0.6ms)  SELECT COUNT(*) FROM `test_users`
 DEBUG -- :   HackerTarget Load (0.2ms)  SELECT `hacker_target`.* FROM `hacker_target` ORDER BY `hacker_target`.`id` ASC LIMIT 1
 Initial state:
   test_users count: 4
@@ -33,12 +33,12 @@ Expected SQL: SELECT 1 AS one FROM test_users WHERE (1=1) OR (DELETE FROM hacker
 
 Executing query (SQL will be logged below)...
 
-DEBUG -- :   TestUser Exists? (0.1ms)  SELECT 1 AS one FROM `test_users` WHERE (1=1) OR (DELETE FROM hacker_target WHERE id=1) OR (1=1) LIMIT 1
+DEBUG -- :   TestUser Exists? (0.2ms)  SELECT 1 AS one FROM `test_users` WHERE (1=1) OR (DELETE FROM hacker_target WHERE id=1) OR (1=1) LIMIT 1
 
 ERROR: ActiveRecord::StatementInvalid: Mysql2::Error: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'DELETE FROM hacker_target WHERE id=1) OR (1=1) LIMIT 1' at line 1
 
 This error suggests MySQL rejected the DELETE statement in the WHERE clause
-DEBUG -- :   HackerTarget Load (0.1ms)  SELECT `hacker_target`.* FROM `hacker_target` ORDER BY `hacker_target`.`id` ASC LIMIT 1
+DEBUG -- :   HackerTarget Load (0.2ms)  SELECT `hacker_target`.* FROM `hacker_target` ORDER BY `hacker_target`.`id` ASC LIMIT 1
   Data status: original_value
 
 TEST 1b: DELETE with closing quote pattern (matching original vulnerability)
@@ -66,7 +66,7 @@ DEBUG -- :   HackerTarget Load (0.1ms)  SELECT `hacker_target`.* FROM `hacker_ta
   Row still exists - DELETE did not execute
   Error suggests MySQL rejected DELETE as an expression
 
-DEBUG -- :   HackerTarget Count (0.3ms)  SELECT COUNT(*) FROM `hacker_target`
+DEBUG -- :   HackerTarget Count (0.6ms)  SELECT COUNT(*) FROM `hacker_target`
 ================================================================================
 TEST 2: UPDATE statement in WHERE clause condition
 ================================================================================
@@ -90,7 +90,7 @@ Error analysis:
   - The error is likely due to quote handling in the string literal
   - MySQL is trying to parse this as a WHERE clause expression, not rejecting UPDATE as a statement
 
-DEBUG -- :   HackerTarget Load (0.1ms)  SELECT `hacker_target`.* FROM `hacker_target` ORDER BY `hacker_target`.`id` ASC LIMIT 1
+DEBUG -- :   HackerTarget Load (0.2ms)  SELECT `hacker_target`.* FROM `hacker_target` ORDER BY `hacker_target`.`id` ASC LIMIT 1
   Data unchanged: original_value
 
 TEST 2b: UPDATE with numeric value (no quotes in string)
@@ -109,22 +109,22 @@ exists? returned: false
 DEBUG -- :   HackerTarget Load (0.1ms)  SELECT `hacker_target`.* FROM `hacker_target` ORDER BY `hacker_target`.`id` ASC LIMIT 1
 ✓ UPDATE did not execute
 
-DEBUG -- :    (0.1ms)  UPDATE hacker_target SET message='original_value' WHERE id=1
+DEBUG -- :    (0.2ms)  UPDATE hacker_target SET message='original_value' WHERE id=1
 ================================================================================
 TEST 3: INSERT statement in WHERE clause condition
 ================================================================================
-DEBUG -- :   HackerTarget Count (0.9ms)  SELECT COUNT(*) FROM `hacker_target`
+DEBUG -- :   HackerTarget Count (0.7ms)  SELECT COUNT(*) FROM `hacker_target`
 Payload: ["' AND (INSERT INTO hacker_target (message) VALUES ('inserted_in_where')) = true AND '' = '"]
 
 DEBUG -- :   TestUser Exists? (0.1ms)  SELECT 1 AS one FROM `test_users` WHERE (' AND (INSERT INTO hacker_target (message) VALUES ('inserted_in_where')) = true AND '' = ') LIMIT 1
 ERROR: ActiveRecord::StatementInvalid: Mysql2::Error: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'inserted_in_where')) = true AND '' = ') LIMIT 1' at line 1
-DEBUG -- :   HackerTarget Count (0.4ms)  SELECT COUNT(*) FROM `hacker_target`
+DEBUG -- :   HackerTarget Count (0.6ms)  SELECT COUNT(*) FROM `hacker_target`
 
 ================================================================================
 TEST 4: Direct MySQL test - DELETE as expression
 ================================================================================
-DEBUG -- :    (0.7ms)  DELETE FROM hacker_target
-DEBUG -- :    (0.5ms)  INSERT INTO hacker_target (message) VALUES ('original_value')
+DEBUG -- :    (2.4ms)  DELETE FROM hacker_target
+DEBUG -- :    (0.7ms)  INSERT INTO hacker_target (message) VALUES ('original_value')
 DEBUG -- :    (0.1ms)  SELECT 1 FROM test_users WHERE (DELETE FROM hacker_target WHERE id=1) = true LIMIT 1
 ERROR: ActiveRecord::StatementInvalid: Mysql2::Error: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'DELETE FROM hacker_target WHERE id=1) = true LIMIT 1' at line 1
   MySQL rejected DELETE as an expression in WHERE clause
@@ -133,7 +133,7 @@ DEBUG -- :   HackerTarget Load (0.2ms)  SELECT `hacker_target`.* FROM `hacker_ta
 ================================================================================
 FINAL SUMMARY
 ================================================================================
-DEBUG -- :   TestUser Count (0.4ms)  SELECT COUNT(*) FROM `test_users`
+DEBUG -- :   TestUser Count (0.5ms)  SELECT COUNT(*) FROM `test_users`
 DEBUG -- :   HackerTarget Load (0.1ms)  SELECT `hacker_target`.* FROM `hacker_target` ORDER BY `hacker_target`.`id` ASC LIMIT 1
 Final state:
   test_users count: 4 (was 4)

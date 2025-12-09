@@ -32,7 +32,7 @@ Error explanation:
 
 Checking data status with fresh connection (to avoid 'out of sync' error)...
   Query: SELECT message, modified_at FROM hacker_target WHERE id = 1
-  Result: {"message"=>"hacker_was_here", "modified_at"=>2025-12-09 13:50:40 -0800}
+  Result: {"message"=>"hacker_was_here", "modified_at"=>2025-12-09 14:21:53 -0800}
 
 ✓ EXPECTED: Multi-statement UPDATE executed successfully
   The UPDATE executed before the 'out of sync' error occurred
@@ -43,7 +43,7 @@ INTERIM CHECK: Did multi-statement UPDATE execute?
 ================================================================================
 Current data status:
   message: hacker_was_here
-  modified_at: 2025-12-09 13:50:40 -0800
+  modified_at: 2025-12-09 14:21:53 -0800
 
 ✓ EXPECTED: Multi-statement UPDATE executed
    This confirms multi-statements work when MULTI_STATEMENTS flag is enabled
